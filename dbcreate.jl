@@ -6,7 +6,7 @@ using ZipFile
 using CodecZlib
 using CodecLz4
 
-function openLogDatabase(dbpath)
+function createLogDatabase(dbpath::String)
 
     db = SQLite.DB(dbpath)
 
@@ -34,86 +34,152 @@ function openLogDatabase(dbpath)
     )
 end
 
-function getLogData(m::RegexMatch)
+function getLogContent(m::RegexMatch)
 
-    datetime = DateTime(m[:id][1:10] * m[:min], "yyyymmddHHMM")
+    logid::String = m[:id]
+
+    datetime = Dates.datetime2epochms(DateTime(
+            parse(Int, logid[1:4]),
+            parse(Int, logid[5:6]),
+            parse(Int, logid[7:8]),
+            parse(Int, logid[9:10]),
+            parse(Int, m[:min])
+        ))
 
     buffer = IOBuffer()
     retry(Downloads.download, delays = [0.2, 0.5, 1, 2, 3])(
-            "http://tenhou.net/0/log/?" * m[:id], buffer
+            "http://tenhou.net/0/log/?" * logid, buffer
         )
 
     content = transcode(LZ4FrameCompressor, take!(buffer))
 
-    return m[:id], Dates.datetime2epochms(datetime), content
+    return logid, datetime, content
 end
 
-function createDBFromIndex(indexpath, dbpath, gametype)
+function buildLogDatabase(indexpath::String, dbpath::String, gametype::String)
 
     # open database and compile sql statements
     insertind, insertrec, selectind, selectrec, beginsql, endsql =
-            openLogDatabase(dbpath)
+            createLogDatabase(dbpath)
     println("* Database connected")
-    processed = DataFrame(DBInterface.execute(selectind))
+
+    # get list of subindexes already appended to database
+    indexinfo = DataFrame(DBInterface.execute(selectind))
+    appended = isempty(indexinfo) ? String[] : indexinfo.id::Vector{String}
 
     # create regular expression for specified gametype
     rx = Regex(":(?<min>\\d\\d)[\\W\\d]+?$gametype[^?]+\\?log=(?<id>[^\"]+)")
 
     # iterate over all unique html subindexes in index archive
-    global zipfile = ZipFile.Reader(indexpath)
+    zipfile = ZipFile.Dir(indexpath)
     for file in zipfile.files
-        notprocessed = isempty(processed) || !(file.name in processed.id)
-        if (occursin("scc", file.name) && notprocessed)
+        if (occursin("scc", file.name) && !(file.name in appended))
 
-            # read subindex into memory (unzip if necessary)
+            # read subindex (unzip if necessary)
             subindex = read(file, String)
             if occursin("gz", file.name)
                 subindex = String(transcode(GzipDecompressor, subindex))
             end
 
             # iterate over each record that matches regex
-            data = Vector{Tuple}()
+            data = Tuple{String,Int64,Array{UInt8,1}}[]
             @sync for match in eachmatch(rx, subindex)
-                @async push!(data, getLogData(match))
+                @async push!(data, getLogContent(match))
             end
 
-            # create current index information tuple
+            # create index information tuple
             info = (
                 file.name,
                 Dates.datetime2epochms(now(UTC)),
-                size(data, 1)
+                length(data)
             )
 
-            # commit available data into database
-            if !(isempty(data) || isempty(info))
-                DBInterface.execute(beginsql)
-                for record in data
-                    DBInterface.execute(insertrec, record)
-                end
-                DBInterface.execute(insertind, info)
-                DBInterface.execute(endsql)
-                println(info[1], ": ", info[3], " logs inserted")
+            # write available data into database
+            DBInterface.execute(beginsql)
+            for record in data
+                DBInterface.execute(insertrec, record)
             end
+            DBInterface.execute(insertind, info)
+            DBInterface.execute(endsql)
+            println(info[1], ": ", info[3], " logs inserted")
         end
     end
 
-    # confirm all work is done
+    # after all work is done
+    close(zipfile)
     println("* Database complete")
 end
 
-for arg in ARGS[2:length(ARGS)]
-    # get game type from first arg
-    if (ARGS[1] == "s4p")
-        gametype = "四.南";
-    elseif (ARGS[1] == "s3p")
-        gametype = "三.南";
-    elseif (ARGS[1] == "e4p")
-        gametype = "四.東";
-    elseif (ARGS[1] == "e3p")
-        gametype = "三.東";
-    else exit() end
-    # create database for any index archive in consequent args
-    if occursin("zip", arg)
-        createDBFromIndex(arg, split(arg, ".")[1] * ARGS[1] * ".db", gametype)
+function downloadProgress()
+
+    local lastprinted = Ref(0)
+    (total, current) -> begin
+
+        if (current > lastprinted[] + 200000)   # print every 200kb
+            lastprinted[] = current
+            write(stdout, "\e[1G" * "< Downloading: $current/$total\t")
+        end
+
+        return nothing
     end
+end
+
+function downloadLogIndex(year::String)
+
+    result = Downloads.download("http://tenhou.net/sc/raw/scraw$year.zip",
+            "scraw$year.zip", progress = downloadProgress(), verbose = true)
+    write(stdout, "* Download complete: scraw$year.zip\n\n")
+
+    return result
+end
+
+if !isinteractive() # running as a script
+
+    usage = """Command line usage: julia dbcreate.jl [command]
+      Available commands:
+        index [years] -- Download Tenhou.net scraw indexes for the list of
+                         [years]. Indexes will be used later when creating
+                         log file database.
+        s4p [indexes] -- Create database for all 4p south games in [indexes]
+        e4p [indexes] -- Create database for all 4p east games in [indexes]
+        s3p [indexes] -- Create database for all 3p south games in [indexes]
+        e3p [indexes] -- Create database for all 3p east games in [indexes]
+    """
+
+    function helpfulExit()
+        println(usage)
+        exit()
+    end
+
+    if length(ARGS) < 2
+        helpfulExit()
+    end
+
+    for arg in ARGS[2:length(ARGS)]
+
+        if (ARGS[1] == "index")
+
+            # download index archives for specified years
+            @assert 2009 <= parse(Int, arg) <= Dates.year(now(UTC))
+            downloadLogIndex(arg)
+        else
+
+            # get game type from the first arg
+            if (ARGS[1] == "s4p")
+                gametype = "四.南";
+            elseif (ARGS[1] == "s3p")
+                gametype = "三.南";
+            elseif (ARGS[1] == "e4p")
+                gametype = "四.東";
+            elseif (ARGS[1] == "e3p")
+                gametype = "三.東";
+            else helpfulExit() end
+
+            # create database for selected index archives
+            @assert occursin("scraw", arg) && occursin("zip", arg)
+            databasename = split(arg, ".")[1] * ARGS[1] * ".db"
+            buildLogDatabase(arg, databasename, gametype)
+        end
+    end
+
 end

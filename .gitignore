@@ -6,6 +6,5 @@
 *.jl.mem
 
 # Mahjong related books, Tenhou.net logs and databases
-books/
 scraw*
 *.log
