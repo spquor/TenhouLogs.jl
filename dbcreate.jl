@@ -61,7 +61,7 @@ function buildLogDatabase(indexpath::String, dbpath::String, gametype::String)
     # open database and compile sql statements
     insertind, insertrec, selectind, selectrec, beginsql, endsql =
             createLogDatabase(dbpath)
-    println("* Database connected")
+    println("* Database connected - ", dbpath)
 
     # get list of subindexes already appended to database
     indexinfo = DataFrame(DBInterface.execute(selectind))
@@ -81,33 +81,29 @@ function buildLogDatabase(indexpath::String, dbpath::String, gametype::String)
                 subindex = String(transcode(GzipDecompressor, subindex))
             end
 
-            # iterate over each record that matches regex
-            data = Tuple{String,Int64,Array{UInt8,1}}[]
-            @sync for match in eachmatch(rx, subindex)
-                @async push!(data, getLogContent(match))
+            # download and append log content to database
+            matches = collect(eachmatch(rx, subindex))
+            DBInterface.execute(beginsql)
+            @sync for match in matches
+                @async DBInterface.execute(insertind, getLogContent(match))
             end
 
-            # create index information tuple
-            info = (
+            # append subindex information
+            DBInterface.execute(insertind, (
                 file.name,
                 Dates.datetime2epochms(now(UTC)),
-                length(data)
-            )
+                length(matches)
+            ))
 
             # write available data into database
-            DBInterface.execute(beginsql)
-            for record in data
-                DBInterface.execute(insertrec, record)
-            end
-            DBInterface.execute(insertind, info)
             DBInterface.execute(endsql)
-            println(info[1], ": ", info[3], " logs inserted")
+            println(file.name, ": ", length(matches), " logs inserted")
         end
     end
 
     # after all work is done
     close(zipfile)
-    println("* Database complete")
+    println("* Database complete - ", dbpath)
 end
 
 function downloadProgress()
