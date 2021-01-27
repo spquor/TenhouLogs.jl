@@ -22,37 +22,27 @@ end
 function rxiterator(rx::Regex, str::AbstractString)
 
     matches = eachmatch(rx, str)
+    local state = Ref((0, false))
 
-    () -> begin
+    (rx::Regex = r"") -> begin
 
-        if @isdefined state
-            nextmatch = iterate(matches, state)
+        if !iszero(state[][begin])
+            m, state[] = iterate(matches, state[])
         else
-            nextmatch = iterate(matches)
+            m, state[] = iterate(matches)
         end
 
-        m, state = nextmatch
+        while !occursin(rx, m[:tag])
+            m, state[] = iterate(matches, state[])
+        end
 
-        return SubString{String}[cap for cap in m.captures if !isnothing(cap)]
+        return m[:str]
     end
 end
 
-function Tile(wallid::AbstractString)
-
-    id = parse(Int, wallid)
-    suit = Suit(id ÷ 36)
-    rank =  id % 36 ÷ 4
-
-    suit == 字牌 ? Tile(Glyph(rank), suit) : Tile(Numeral(rank), suit)
-end
-
-Base.show(io::IO, z::Tile) = print(io, z.rank, z.suit)
-
 function Rules(go::AbstractString)
 
-    rx = r"\"(?<str>[^\"]+)\""s
-    m = match(rx, go)
-    code = parse(Int, m[:str])
+    code = parse(Int, match(r"\"(?<str>[^\"]+)\""s, go)[:str])
 
     bits = map(Bool, digits(code, base = 2, pad = 8))
     (   !bits[8] && !bits[6]    ) && ( lobby = 一般 )
@@ -94,18 +84,18 @@ function Round(init::AbstractString)
     roundseed = split(m[:str], ",")
     number, repeat, riichi, dice01, dice02, =
             map((s)-> s[1] - '0', roundseed)
-    doraid = Tile(roundseed[end])
+    doraid = Wall[roundseed[end]]
     m, state = iterate(matches, state)
 
     scores = [parse(Int, s) for s in split(m[:str], ",")]
     m, state = iterate(matches, state)
 
-    dealer = Glyph(m[:str][1] - '0')
+    dealer = Seat(m[:str][1] - '0')
     m, state = iterate(matches, state)
 
     haipai = Vector{Tile}[]
     while startswith(m[:tag], "hai")
-        push!(haipai, map(Tile, split(m[:str], ",")))
+        push!(haipai, map(split(m[:str], ",")) do x Wall[x] end)
         nextnode = iterate(matches, state)
         if (nextnode == nothing) break end
         m, state = nextnode
