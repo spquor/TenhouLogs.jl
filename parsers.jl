@@ -26,17 +26,17 @@ function rxiterator(rx::Regex, str::AbstractString)
 
     (rx::Regex = r"") -> begin
 
-        if !iszero(state[][begin])
+        if !iszero(state[][1])
             m, state[] = iterate(matches, state[])
         else
             m, state[] = iterate(matches)
         end
 
-        while !occursin(rx, m[:tag])
+        while !occursin(rx, m[1])
             m, state[] = iterate(matches, state[])
         end
 
-        return m[:str]
+        return m
     end
 end
 
@@ -53,53 +53,30 @@ function Rules(go::AbstractString)
     Rules(!bits[1], !bits[2], !bits[3], bits[4], bits[5], bits[7], lobby)
 end
 
-function Table(un::AbstractString)
+function Table(un::AbstractString, np::Int8)
 
-    rx = r"\s(?<tag>[^=]+)=\"(?<str>[^\"]+)\""s
-    matches = eachmatch(rx, un)
-    m, state = iterate(matches)
+    it = rxiterator(r"\s(?<tag>[^=]+)=\"(?<str>[^\"]+)\""s, un)
 
-    names = String[]
-    while (m[:tag] != "dan")
-        push!(names, decodeuri(m[:str]))
-        m, state = iterate(matches, state)
-    end
+    names = [decodeuri(it()[:str]) for s = 1:np]
+    ranks = map(Dan, [parse(Int8, s) for s in split(it()[:str], ",")])
+    rates = [parse(Float32, s) for s in split(it()[:str], ",")]
+    sexes = map((s)-> s[1], split(it()[:str], ","))
 
-    ranks = map(Dan, [parse(Int8, s) for s in split(m[:str], ",")])
-    m, state = iterate(matches, state)
-
-    rates = [parse(Float32, s) for s in split(m[:str], ",")]
-    m, state = iterate(matches, state)
-
-    sexes = map((s)-> s[1], split(m[:str], ","))
     Table(names, ranks, rates, sexes)
 end
 
-function Round(init::AbstractString)
+function Round(init::AbstractString, np::Int8)
 
-    rx = r"\s(?<tag>[^=]+)=\"(?<str>[^\"]+)\""s
-    matches = eachmatch(rx, init)
-    m, state = iterate(matches)
+    it = rxiterator(r"\s(?<tag>[^=]+)=\"(?<str>[^\"]+)\""s, init)
 
-    roundseed = split(m[:str], ",")
+    roundseed = split(it()[:str], ",")
     number, repeat, riichi, dice01, dice02, =
             map((s)-> s[1] - '0', roundseed)
     doraid = Wall[roundseed[end]]
-    m, state = iterate(matches, state)
 
-    scores = [parse(Int, s) for s in split(m[:str], ",")]
-    m, state = iterate(matches, state)
-
-    dealer = Seat(m[:str][1] - '0')
-    m, state = iterate(matches, state)
-
-    haipai = Vector{Tile}[]
-    while startswith(m[:tag], "hai")
-        push!(haipai, map(split(m[:str], ",")) do x Wall[x] end)
-        nextnode = iterate(matches, state)
-        if (nextnode == nothing) break end
-        m, state = nextnode
-    end
+    scores = [parse(Int, s) for s in split(it()[:str], ",")]
+    dealer = Seat(it()[:str][1] - '0')
+    haipai = [map(split(it()[:str], ",")) do x Wall[x] end for s = 1:np]
 
     Round(number, repeat, riichi, dice01, dice02,
             doraid, dealer, scores, haipai)

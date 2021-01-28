@@ -4,6 +4,8 @@ using CodecLz4
 
 include("parsers.jl")
 
+Base.show(io::IO, t::Tile) = print(io, t.rank, t.suit)
+
 mutable struct PlayState
     scores:: Vector{Points}
     hands:: Vector{Hand}
@@ -13,66 +15,45 @@ end
 
 function analyseLog(log::AbstractString)
 
-    rx = r"<(?<tag>[A-Z]+)(?<str>.+?)\/>"s
-    command = eachmatch(rx, log)
-    cmd, state = iterate(command)
+    it = rxiterator(r"<(?<tag>[A-Z]+)(?<str>.+?)\/>"s, log)
 
-    while(cmd[:tag] != "GO")
-        cmd, state = iterate(command, state)
-    end
-    rules = Rules(cmd[:str])
+    rules = Rules(it(r"GO")[:str])
+    numplayers::Int8 = rules.sanma ? 3 : 4
+    table = Table(it(r"UN")[:str], numplayers)
 
-    while(cmd[:tag] != "UN")
-        cmd, state = iterate(command, state)
-    end
-    table = Table(cmd[:str])
-
-    while(cmd[:tag] != "INIT")
-        cmd, state = iterate(command, state)
+    init() = begin
+        round = Round(it(r"INIT")[:str], numplayers)
+        playstate = PlayState(
+            round.scores, round.haipai,
+            [PlayedTile[] for i=1:4],
+            [Meld[] for i=1:4]
+        )
     end
 
-    nextnode = (cmd, state)
-    playstate = PlayState(
-        Vector{Points}(undef, 4),
-        Vector{Hand}(undef, 4),
-        Vector{Pond}(undef, 4),
-        Vector{Melds}(undef, 4)
-    )
+    init()
 
-    while (nextnode != nothing)
+    while true  play = it()
 
-        cmd, state = nextnode
-        round = Round(cmd[:str])
-        @show round
+        if play[:tag] in ["T", "U", "V", "W", "D", "E", "F", "G"]
+            draw = Wall[play[:str]]
 
-        playstate.scores = round.scores
-        playstate.hands = round.haipai
-
-        cmd, state = iterate(command, state)
-
-        while true
-
-            if cmd[:tag] in ["T", "U", "V", "W", "D", "E", "F", "G"]
-                draw = Wall[cmd[:str]]
-
-            elseif cmd[:tag] == "N"
-                #call meld
-            elseif cmd[:tag] == "REACH"
-                #coll riichi
-            elseif cmd[:tag] == "DORA"
-                #flip dora
-            elseif cmd[:tag] == "AGARI"
-                #win
-                nextnode = iterate(command, state)
+        elseif play[:tag] == "N"
+            #call meld
+        elseif play[:tag] == "REACH"
+            #coll riichi
+        elseif play[:tag] == "DORA"
+            #flip dora
+        elseif play[:tag] == "AGARI"
+            #win
+            if occursin("owari", play.match)
                 break
-            elseif cmd[:tag] == "RYUUKYOKU"
-                #tie
-                nextnode = iterate(command, state)
+            else init() end
+        elseif play[:tag] == "RYUUKYOKU"
+            #tie
+            if occursin("owari", play.match)
                 break
-            else error("Invalid tag") end
-
-            cmd, state = iterate(command, state)
-        end
+            else init() end
+        else error("Invalid tag") end
 
     end
 
