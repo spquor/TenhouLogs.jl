@@ -7,10 +7,16 @@ include("parsers.jl")
 Base.show(io::IO, t::Tile) = print(io, t.rank, t.suit)
 
 mutable struct PlayState
-    scores:: Vector{Points}
-    hands:: Vector{Hand}
-    ponds:: Vector{Pond}
-    melds:: Vector{Melds}
+    round::     Round
+    dealer::    Seat
+    repeat::    Int8
+    riichi::    Int8
+    doraid::    Vector{Tile}
+    scores::    Vector{Points}
+    hands::     Vector{Hand}
+    ponds::     Vector{Pond}
+    melds::     Vector{Melds}
+    turn::      Int8
 end
 
 function analyseLog(log::AbstractString)
@@ -21,16 +27,16 @@ function analyseLog(log::AbstractString)
     numplayers::Int8 = rules.sanma ? 3 : 4
     table = Table(it(r"UN")[:str], numplayers)
 
-    init() = begin
-        round = Round(it(r"INIT")[:str], numplayers)
+    roundinit() = begin
+        r = RoundInit(it(r"INIT")[:str], numplayers)
         playstate = PlayState(
-            round.scores, round.haipai,
-            [PlayedTile[] for i=1:4],
-            [Meld[] for i=1:4]
+            r.round, r.dealer, r.repeat, r.riichi,
+            [r.doraid], copy(r.scores), copy(r.haipai),
+            [PlayedTile[] for i=1:4], [Meld[] for i=1:4], 0
         )
     end
 
-    init()
+    roundinit()
 
     while true  play = it()
 
@@ -44,15 +50,23 @@ function analyseLog(log::AbstractString)
         elseif play[:tag] == "DORA"
             #flip dora
         elseif play[:tag] == "AGARI"
-            #win
+
+            @show RoundWin(play[:str])
+
             if occursin("owari", play.match)
+                @show GameResults(play[:str])
                 break
-            else init() end
+            else roundinit() end
+
         elseif play[:tag] == "RYUUKYOKU"
-            #tie
+
+            @show RoundTie(play[:str])
+
             if occursin("owari", play.match)
+                @show GameResults(play[:str])
                 break
-            else init() end
+            else roundinit() end
+
         else error("Invalid tag") end
 
     end

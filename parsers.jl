@@ -65,7 +65,7 @@ function Table(un::AbstractString, np::Int8)
     Table(names, ranks, rates, sexes)
 end
 
-function Round(init::AbstractString, np::Int8)
+function RoundInit(init::AbstractString, np::Int8)
 
     it = rxiterator(r"\s(?<tag>[^=]+)=\"(?<str>[^\"]+)\""s, init)
 
@@ -78,6 +78,66 @@ function Round(init::AbstractString, np::Int8)
     dealer = Seat(it()[:str][1] - '0')
     haipai = [map(split(it()[:str], ",")) do x Wall[x] end for s = 1:np]
 
-    Round(number, repeat, riichi, dice01, dice02,
-            doraid, dealer, scores, haipai)
+    RoundInit(Round(number), (Dice(dice01), Dice(dice02)),
+            dealer, doraid, repeat, riichi, scores, haipai)
+end
+
+function RoundWin(agari::AbstractString)
+
+    it = rxiterator(r"\s(?<tag>[^=]+)=\"(?<str>[^\"]+)\""s, agari)
+
+    fu, pt, lh = [parse(Int, s) for s in split(it(r"ten")[:str], ",")]
+
+    combo = split(it()[:str], ",")
+
+    yaku = [
+        (Yaku(parse(Int, combo[index])), parse(Int8, combo[index + 1]))
+        for index in range(1, length(combo); step = 2)
+    ]
+
+    han = mapreduce(x->x[2], +, yaku)
+
+    dora = map(split(it()[:str], ",")) do x Wall[x] end
+    ura = occursin("Ura", agari) ?
+        map(split(it()[:str], ",")) do x Wall[x] end : Tile[]
+
+    caller = Seat(parse(Int, it()[:str]))
+    provider = Seat(parse(Int, it()[:str]))
+
+    RoundWin(pt, (han, fu), Limit(lh), yaku, dora, ura, caller, provider)
+end
+
+function RoundTie(ryuukyoku::AbstractString)
+
+    tierule = notile
+    reveal = Seat[]
+
+    if (occursin("type", ryuukyoku))
+        tierule = Ryuukyoku(
+            findfirst(isequal(match(r"\"(?<str>[^\"]+)\""s, ryuukyoku)[:str]),
+                ["yao9", "reach4", "ron3", "kan4", "kaze4", "nm"]
+        ))
+    end
+
+    occursin("hai0", ryuukyoku) && push!(reveal, Seat(0))
+    occursin("hai1", ryuukyoku) && push!(reveal, Seat(1))
+    occursin("hai2", ryuukyoku) && push!(reveal, Seat(2))
+    occursin("hai3", ryuukyoku) && push!(reveal, Seat(3))
+
+    RoundTie(tierule, reveal)
+end
+
+function GameResults(owari::AbstractString)
+
+    result = split(match(r"owari=\"(?<str>[^\"]+)\""s, owari)[:str], ",")
+
+    scores = Points[]
+    okauma = Float32[]
+
+    for index in range(1, length(result); step = 2)
+        push!(scores, parse(Points, result[index]))
+        push!(okauma, parse(Float32, result[index+1]))
+    end
+
+    GameResults(scores, okauma)
 end
