@@ -1,44 +1,5 @@
 include("playdata.jl")
-
-function decodeuri(str::AbstractString)
-
-    out = IOBuffer()
-    io = IOBuffer(str)
-
-    while !eof(io)
-        c = read(io, Char)
-        if c == '%'
-            cn = read(io, Char)
-            c = read(io, Char)
-            write(out, parse(UInt8, string(cn, c); base=16))
-        else
-            write(out, c)
-        end
-    end
-
-    return String(take!(out))
-end
-
-function rxiterator(rx::Regex, str::AbstractString)
-
-    matches = eachmatch(rx, str)
-    local state = Ref((0, false))
-
-    (rx::Regex = r"") -> begin
-
-        if !iszero(state[][1])
-            m, state[] = iterate(matches, state[])
-        else
-            m, state[] = iterate(matches)
-        end
-
-        while !occursin(rx, m[1])
-            m, state[] = iterate(matches, state[])
-        end
-
-        return m
-    end
-end
+include("utility.jl")
 
 function Rules(go::AbstractString)
 
@@ -90,10 +51,16 @@ function RoundWin(agari::AbstractString)
 
     combo = split(it()[:str], ",")
 
-    yaku = [
-        (Yaku(parse(Int, combo[index])), parse(Int8, combo[index + 1]))
-        for index in range(1, length(combo); step = 2)
-    ]
+    if length(combo) == 1
+        yaku = [
+            (Yaku(parse(Int, combo[1])), 13)
+        ]
+    else
+        yaku = [
+            (Yaku(parse(Int, combo[index])), parse(Int8, combo[index + 1]))
+            for index in range(1, length(combo); step = 2)
+        ]
+    end
 
     han = mapreduce(x->x[2], +, yaku)
 
@@ -109,7 +76,7 @@ end
 
 function RoundTie(ryuukyoku::AbstractString)
 
-    tierule = notile
+    tierule = tsuujou
     reveal = Seat[]
 
     if (occursin("type", ryuukyoku))
@@ -140,4 +107,12 @@ function GameResults(owari::AbstractString)
     end
 
     GameResults(scores, okauma)
+end
+
+function PlayStateOld(r::RoundInit)
+    PlayStateOld(
+        r.round, r.dealer, r.repeat, r.riichi,
+        [r.doraid], r.scores, r.haipai,
+        [PlayedTile[] for i=1:4], [Meld[] for i=1:4], 0
+    )
 end

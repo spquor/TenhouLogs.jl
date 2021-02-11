@@ -3,23 +3,33 @@ using DataFrames
 using CodecLz4
 
 include("parsers.jl")
+include("parsers_n.jl")
 
-Base.show(io::IO, t::Tile) = print(io, t.rank, t.suit)
+function analyseLog(str::AbstractString)
 
-mutable struct PlayState
-    round::     Round
-    dealer::    Seat
-    repeat::    Int8
-    riichi::    Int8
-    doraid::    Vector{Tile}
-    scores::    Vector{Points}
-    hands::     Vector{Hand}
-    ponds::     Vector{Pond}
-    melds::     Vector{Melds}
-    turn::      Int8
+    playstate = PlayState(undef)
+
+    brk(c) = ('0' <= c <= '9' || c == ' ' || c == '/')
+
+    status = 1
+
+    while status < length(str)
+
+        tagbeg::Int = findnext('<', str, status)
+        tagend::Int = findnext(brk, str, tagbeg)
+        status::Int = findnext('>', str, tagend)
+
+        parser = get(ParserDict, str[(tagbeg+1):(tagend-1)], nothing)
+
+        if !isnothing(parser)
+            parser(str[tagend:status-2], playstate)
+        end
+
+    end
+
 end
 
-function analyseLog(log::AbstractString)
+function analyseLogOld(log::AbstractString)
 
     it = rxiterator(r"<(?<tag>[A-Z]+)(?<str>.+?)\/>"s, log)
 
@@ -27,16 +37,8 @@ function analyseLog(log::AbstractString)
     numplayers::Int8 = rules.sanma ? 3 : 4
     table = Table(it(r"UN")[:str], numplayers)
 
-    roundinit() = begin
-        r = RoundInit(it(r"INIT")[:str], numplayers)
-        playstate = PlayState(
-            r.round, r.dealer, r.repeat, r.riichi,
-            [r.doraid], copy(r.scores), copy(r.haipai),
-            [PlayedTile[] for i=1:4], [Meld[] for i=1:4], 0
-        )
-    end
-
-    roundinit()
+    round = RoundInit(it(r"INIT")[:str], numplayers)
+    playstate = PlayStateOld(round)
 
     while true  play = it()
 
@@ -51,22 +53,29 @@ function analyseLog(log::AbstractString)
             #flip dora
         elseif play[:tag] == "AGARI"
 
-            @show RoundWin(play[:str])
-
+            RoundWin(play[:str])
             if occursin("owari", play.match)
-                @show GameResults(play[:str])
+                GameResults(play[:str])
                 break
-            else roundinit() end
+            end
 
         elseif play[:tag] == "RYUUKYOKU"
 
-            @show RoundTie(play[:str])
-
+            RoundTie(play[:str])
             if occursin("owari", play.match)
-                @show GameResults(play[:str])
+                GameResults(play[:str])
                 break
-            else roundinit() end
+            end
 
+        elseif play[:tag] == "INIT"
+
+            round = RoundInit(play[:str], numplayers)
+            playstate = PlayStateOld(round)
+
+        elseif play[:tag] == "BYE"
+            #player dc'd
+        elseif play[:tag] == "UN"
+            #player rc'd
         else error("Invalid tag") end
 
     end
@@ -82,13 +91,37 @@ function queryLog(dbpath::String, logidx::Int)
     # establish connection and select table
     db = SQLite.DB(dbpath)
     table = DataFrame(
-        DBInterface.execute(db, "SELECT id, content FROM records LIMIT 100;")
+        DBInterface.execute(db, "SELECT id, content FROM records LIMIT 1000;")
     )
 
-    println(table.id[logidx])
-
     # decompress tenhou log contents and return processed table
-    return String(transcode(LZ4FrameDecompressor, table.content[logidx]))
+    return String(
+        transcode(LZ4FrameDecompressor, table.content[logidx])
+    )
 end
 
-analyseLog(queryLog("scraw2009s4p.db", 43))
+function queryLogs(dbpath::String)
+
+    if !isfile(dbpath)
+        error("Database not found!")
+    end
+
+    # establish connection and select table
+    db = SQLite.DB(dbpath)
+    table = DataFrame(
+        DBInterface.execute(db, "SELECT id, content FROM records LIMIT 1000;")
+    )
+
+    # decompress tenhou log contents and return processed table
+    for i = 1:1000
+        analyseLog(String(
+            transcode(LZ4FrameDecompressor, table.content[i])
+        ))
+    end
+end
+
+
+# analyseLog(queryLog("scraw2009s4p.db", 25))
+# analyseLogOld(queryLog("scraw2019s4p.db", 25))
+# queryLog("scraw2009s4p.db", 105)
+queryLogs("scraw2009s4p.db")
