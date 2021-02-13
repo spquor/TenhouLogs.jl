@@ -107,11 +107,6 @@ struct RoundTie
     reveal::    Vector{Seat}
 end
 
-struct GameResults
-    scores::    Vector{Points}
-    okauma::    Vector{Float32}
-end
-
 mutable struct PlayState
     PlayState(
         ::UndefInitializer
@@ -119,19 +114,6 @@ mutable struct PlayState
 
     rules::     Rules
     table::     Table
-    round::     Round
-    dealer::    Seat
-    repeat::    Int8
-    riichi::    Int8
-    doraid::    Vector{Tile}
-    scores::    Vector{Points}
-    hands::     Vector{Hand}
-    ponds::     Vector{Pond}
-    melds::     Vector{Melds}
-    turn::      Int8
-end
-
-mutable struct PlayStateOld
     round::     Round
     dealer::    Seat
     repeat::    Int8

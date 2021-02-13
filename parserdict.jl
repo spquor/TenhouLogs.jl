@@ -3,11 +3,15 @@ include("utility.jl")
 
 @enum MatchEvent noevents matchset roundinit roundwin roundtie matchend tiledraw tiledrop tilecall playerdc
 
-if !( @isdefined ParserDict ) const ParserDict = Dict(
+#if !( @isdefined ParserDict ) const
+ParserDict = Dict(
 
     "GO" => (str::AbstractString, pst::PlayState) -> begin
 
-        getbits(code) = digits(parse(Int, code), base = 2, pad = 8)
+        function getbits(code)
+            digits(parse(Int, code), base = 2, pad = 8)
+        end
+
         bits = map(Bool, parsekey(getbits, "type", str))
 
         (   !bits[8] && !bits[6]    ) && ( lobby = 一般 )
@@ -23,14 +27,17 @@ if !( @isdefined ParserDict ) const ParserDict = Dict(
 
     "UN" => (str::AbstractString, pst::PlayState) -> begin
 
-        names = [
-            parsekey("n$i", str) do s decodeuri(s) end for i=0:3
-        ]
+        names = AbstractString[]
+        for namekey in ["n0", "n1", "n2", "n3"]
+            name = parsekey((s)->decodeuri(s), namekey, str)
+            if !isnothing(name)
+                push!(names, name)
+            end
+        end
 
-        for s in names
-            if isnothing(s)
-                return noevents
-        end end
+        if length(names) == 1
+            return noevents
+        end
 
         ranks = splitkey((s)->Dan(parse(Int,s)), "dan", str)
         rates = splitkey((s)->parse(Float32,s), "rate", str)
@@ -43,17 +50,22 @@ if !( @isdefined ParserDict ) const ParserDict = Dict(
 
     "INIT" => (str::AbstractString, pst::PlayState) -> begin
 
-        roundseed = splitkey((s)->(s), "seed", str)
-        number, repeat, riichi, dice01, dice02, =
+        roundseed::Vector{SubString{String}} =
+                splitkey((s)->(s), "seed", str)
+        number, repeat, riichi, dice01, dice02 =
                 map((s)-> s[1] - '0', roundseed)
         doraid = Wall[roundseed[end]]
 
         dealer = parsekey((s)->Seat(parse(Int,s)), "oya", str)
         scores = splitkey((s)->parse(Points,s), "ten", str)
 
-        haipai = [
-            splitkey("hai$i", str) do s Wall[s] end for i = 0:3
-        ]
+        haipai = Hand[]
+        for haikey in ["hai0", "hai1", "hai2", "hai3"]
+            hai = splitkey(haikey, str) do s Wall[s] end
+            if !isnothing(hai)
+                push!(haipai, hai)
+            end
+        end
 
         RoundInit(Round(number), (Dice(dice01), Dice(dice02)),
                 dealer, doraid, repeat, riichi, scores, haipai)
@@ -142,26 +154,22 @@ if !( @isdefined ParserDict ) const ParserDict = Dict(
     end,
 
     "D" => (str::AbstractString, pst::PlayState) -> begin
-        tileindex = findfirst(isequal(Wall[str]), pst.hands[1])
-        popat!(pst.hands[1], tileindex)
+
         return tiledrop
     end,
 
     "E" => (str::AbstractString, pst::PlayState) -> begin
-        tileindex = findfirst(isequal(Wall[str]), pst.hands[2])
-        popat!(pst.hands[2], tileindex)
+
         return tiledrop
     end,
 
     "F" => (str::AbstractString, pst::PlayState) -> begin
-        tileindex = findfirst(isequal(Wall[str]), pst.hands[3])
-        popat!(pst.hands[3], tileindex)
+
         return tiledrop
     end,
 
     "G" => (str::AbstractString, pst::PlayState) -> begin
-        tileindex = findfirst(isequal(Wall[str]), pst.hands[4])
-        popat!(pst.hands[4], tileindex)
+
         return tiledrop
     end,
 
@@ -185,4 +193,20 @@ if !( @isdefined ParserDict ) const ParserDict = Dict(
         return playerdc
     end
 )
+#end
+
+# tileindex = findfirst(isequal(Wall[str]), pst.hands[1])
+# popat!(pst.hands[1], tileindex)
+
+function GameResults(owari::AbstractString)
+
+    result = split(match(r"owari=\"(?<str>[^\"]+)\""s, owari)[:str], ",")
+
+    scores = Points[]
+    okauma = Float32[]
+
+    for index in range(1, length(result); step = 2)
+        push!(scores, parse(Points, result[index]))
+        push!(okauma, parse(Float32, result[index+1]))
+    end
 end

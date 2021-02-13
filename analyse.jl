@@ -2,8 +2,7 @@ using SQLite
 using DataFrames
 using CodecLz4
 
-include("parsers.jl")
-include("parsers_n.jl")
+include("parserdict.jl")
 
 function analyseLog(str::AbstractString)
 
@@ -12,8 +11,9 @@ function analyseLog(str::AbstractString)
     brk(c) = ('0' <= c <= '9' || c == ' ' || c == '/')
 
     status = 1
+    strlen = length(str)
 
-    while status < length(str)
+    while status < strlen
 
         tagbeg::Int = findnext('<', str, status)
         tagend::Int = findnext(brk, str, tagbeg)
@@ -24,59 +24,6 @@ function analyseLog(str::AbstractString)
         if !isnothing(parser)
             parser(str[tagend:status-2], playstate)
         end
-
-    end
-
-end
-
-function analyseLogOld(log::AbstractString)
-
-    it = rxiterator(r"<(?<tag>[A-Z]+)(?<str>.+?)\/>"s, log)
-
-    rules = Rules(it(r"GO")[:str])
-    numplayers::Int8 = rules.sanma ? 3 : 4
-    table = Table(it(r"UN")[:str], numplayers)
-
-    round = RoundInit(it(r"INIT")[:str], numplayers)
-    playstate = PlayStateOld(round)
-
-    while true  play = it()
-
-        if play[:tag] in ["T", "U", "V", "W", "D", "E", "F", "G"]
-            draw = Wall[play[:str]]
-
-        elseif play[:tag] == "N"
-            #call meld
-        elseif play[:tag] == "REACH"
-            #coll riichi
-        elseif play[:tag] == "DORA"
-            #flip dora
-        elseif play[:tag] == "AGARI"
-
-            RoundWin(play[:str])
-            if occursin("owari", play.match)
-                GameResults(play[:str])
-                break
-            end
-
-        elseif play[:tag] == "RYUUKYOKU"
-
-            RoundTie(play[:str])
-            if occursin("owari", play.match)
-                GameResults(play[:str])
-                break
-            end
-
-        elseif play[:tag] == "INIT"
-
-            round = RoundInit(play[:str], numplayers)
-            playstate = PlayStateOld(round)
-
-        elseif play[:tag] == "BYE"
-            #player dc'd
-        elseif play[:tag] == "UN"
-            #player rc'd
-        else error("Invalid tag") end
 
     end
 
@@ -120,8 +67,5 @@ function queryLogs(dbpath::String)
     end
 end
 
-
 # analyseLog(queryLog("scraw2009s4p.db", 25))
-# analyseLogOld(queryLog("scraw2019s4p.db", 25))
-# queryLog("scraw2009s4p.db", 105)
 queryLogs("scraw2009s4p.db")
