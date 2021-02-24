@@ -23,23 +23,12 @@ struct Tile
     suit::      Suit
 end
 
-if !( @isdefined Hand )
-    const Hand = Vector{Tile}
-end
-
-struct PlayedTile
-    tile::      Tile
-    play::      Play
-    from::      Seat
-    tsumogiri:: Bool
-end
-
-if !( @isdefined Pond )
-    const Pond = Vector{PlayedTile}
+if !( @isdefined Tiles )
+    const Tiles = Vector{Tile}
 end
 
 struct Meld
-    called::    PlayedTile
+    called::    Tile
     play::      Play
     from::      Seat
     with::      Vector{Tile}
@@ -47,20 +36,6 @@ end
 
 if !( @isdefined Melds )
     const Melds = Vector{Meld}
-end
-
-if !( @isdefined Wall )
-    const Wall = Dict(
-        "$c" => Tile(
-            c < 108 ? Rank(c % 36 ÷ 4) :
-                Rank(c % 36 ÷ 4 + 9),
-                    Suit(c ÷ 36)
-        ) for c = 0:135
-    )
-end
-
-if !( @isdefined Points )
-    const Points = Int32
 end
 
 struct Rules
@@ -80,31 +55,27 @@ struct Table
     sexes::     Vector{Char}
 end
 
-struct RoundInit
-    round::     Round
-    rolls::     Tuple{Dice,Dice}
-    dealer::    Seat
-    doraid::    Tile
-    repeat::    Int8
-    riichi::    Int8
-    scores::    Vector{Points}
-    haipai::    Vector{Hand}
-end
+abstract type Result end
 
-struct RoundWin
-    value::     Points
+struct RoundWin <: Result
+    value::     Int32
     hanfu::     Tuple{Int8,Int8}
     limit::     Limit
     yaku::      Vector{Tuple{Yaku,Int8}}
-    dora::      Vector{Tile}
-    ura::       Vector{Tile}
+    dora::      Tiles
+    ura::       Tiles
     caller::    Seat
     provider::  Seat
 end
 
-struct RoundTie
+struct RoundTie <: Result
     tierule::   Ryuukyoku
     reveal::    Vector{Seat}
+end
+
+struct GameOver <: Result
+    scores::    Vector{Int32}
+    okauma::    Vector{Float32}
 end
 
 mutable struct PlayState
@@ -115,13 +86,25 @@ mutable struct PlayState
     rules::     Rules
     table::     Table
     round::     Round
+    rolls::     Tuple{Dice,Dice}
+    turn::      Int8
     dealer::    Seat
     repeat::    Int8
     riichi::    Int8
-    doraid::    Vector{Tile}
-    scores::    Vector{Points}
-    hands::     Vector{Hand}
-    ponds::     Vector{Pond}
+    doraid::    Tiles
+    scores::    Vector{Int32}
+    hands::     Vector{Tiles}
     melds::     Vector{Melds}
-    turn::      Int8
+    ponds::     Vector{Tiles}
+    result::    Result
+end
+
+if !( @isdefined Wall )
+    const Wall = Dict(
+        "$c" => Tile(
+            c < 108 ? Rank(c % 36 ÷ 4) :
+                Rank(c % 36 ÷ 4 + 9),
+                    Suit(c ÷ 36)
+        ) for c = 0:135
+    )
 end

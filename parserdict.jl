@@ -52,14 +52,18 @@ ParserDict = Dict(
 
         roundseed::Vector{SubString{String}} =
                 splitkey((s)->(s), "seed", str)
-        number, repeat, riichi, dice01, dice02 =
+        number, pst.repeat, pst.riichi, dice01, dice02 =
                 map((s)-> s[1] - '0', roundseed)
-        doraid = Wall[roundseed[end]]
+        doraid = [Wall[roundseed[end]]]
 
-        dealer = parsekey((s)->Seat(parse(Int,s)), "oya", str)
-        scores = splitkey((s)->parse(Points,s), "ten", str)
+        pst.round = Round(number)
+        pst.rolls = Dice(dice01), Dice(dice02)
+        pst.turn = 0
 
-        haipai = Hand[]
+        pst.dealer = parsekey((s)->Seat(parse(Int,s)), "oya", str)
+        pst.scores = splitkey((s)->parse(Int32,s), "ten", str)
+
+        haipai = Tiles[]
         for haikey in ["hai0", "hai1", "hai2", "hai3"]
             hai = splitkey(haikey, str) do s Wall[s] end
             if !isnothing(hai)
@@ -67,12 +71,9 @@ ParserDict = Dict(
             end
         end
 
-        RoundInit(Round(number), (Dice(dice01), Dice(dice02)),
-                dealer, doraid, repeat, riichi, scores, haipai)
-
-        pst.round = Round(number)
-        pst.scores = scores
         pst.hands = haipai
+        pst.melds = [Melds[] for i in 1:4]
+        pst.ponds = [Tiles[] for i in 1:4]
 
         return roundinit
     end,
@@ -154,22 +155,26 @@ ParserDict = Dict(
     end,
 
     "D" => (str::AbstractString, pst::PlayState) -> begin
-
+        tileindex = findfirst(isequal(Wall[str]), pst.hands[1])
+        push!(pst.ponds[1], popat!(pst.hands[1], tileindex))
         return tiledrop
     end,
 
     "E" => (str::AbstractString, pst::PlayState) -> begin
-
+        tileindex = findfirst(isequal(Wall[str]), pst.hands[2])
+        push!(pst.ponds[2], popat!(pst.hands[2], tileindex))
         return tiledrop
     end,
 
     "F" => (str::AbstractString, pst::PlayState) -> begin
-
+        tileindex = findfirst(isequal(Wall[str]), pst.hands[3])
+        push!(pst.ponds[3], popat!(pst.hands[3], tileindex))
         return tiledrop
     end,
 
     "G" => (str::AbstractString, pst::PlayState) -> begin
-
+        tileindex = findfirst(isequal(Wall[str]), pst.hands[4])
+        push!(pst.ponds[4], popat!(pst.hands[4], tileindex))
         return tiledrop
     end,
 
@@ -195,18 +200,15 @@ ParserDict = Dict(
 )
 #end
 
-# tileindex = findfirst(isequal(Wall[str]), pst.hands[1])
-# popat!(pst.hands[1], tileindex)
-
 function GameResults(owari::AbstractString)
 
     result = split(match(r"owari=\"(?<str>[^\"]+)\""s, owari)[:str], ",")
 
-    scores = Points[]
+    scores = Int32[]
     okauma = Float32[]
 
     for index in range(1, length(result); step = 2)
-        push!(scores, parse(Points, result[index]))
+        push!(scores, parse(Int32, result[index]))
         push!(okauma, parse(Float32, result[index+1]))
     end
 end
