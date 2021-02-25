@@ -36,6 +36,9 @@ ParserDict = Dict(
         end
 
         if length(names) == 1
+            nameindex = findfirst(isequal(names[1]), pst.table.names) - 1
+            seatindex = findfirst(isequal(Seat(nameindex)), pst.dropped)
+            popat!(pst.dropped, seatindex)
             return noevents
         end
 
@@ -44,6 +47,7 @@ ParserDict = Dict(
         sexes = splitkey((s)->(s[1]), "sx", str)
 
         pst.table = Table(names, ranks, rates, sexes)
+        pst.dropped = Seat[]
 
         return matchset
     end,
@@ -74,6 +78,7 @@ ParserDict = Dict(
         pst.hands = haipai
         pst.melds = [Melds[] for i in 1:4]
         pst.ponds = [Tiles[] for i in 1:4]
+        pst.result = nothing
 
         return roundinit
     end,
@@ -107,7 +112,8 @@ ParserDict = Dict(
         w = parsekey((s)->Seat(parse(Int,s)), "who", str)
         f = parsekey((s)->Seat(parse(Int,s)), "fromWho", str)
 
-        RoundWin(pt, (han, fu), Limit(lh), yaku, dora, ura, w, f)
+        pst.scores = splitkey((s)->parse(Int32,s), "sc", str)
+        pst.result = RoundWin(pt, (han, fu), Limit(lh), yaku, dora, ura, w, f)
 
         return roundwin
     end,
@@ -129,7 +135,8 @@ ParserDict = Dict(
         occursin("hai2", str) && push!(reveal, Seat(2))
         occursin("hai3", str) && push!(reveal, Seat(3))
 
-        RoundTie(tierule, reveal)
+        pst.scores = splitkey((s)->parse(Int32,s), "sc", str)
+        pst.result = RoundTie(tierule, reveal)
 
         return roundtie
     end,
@@ -194,21 +201,8 @@ ParserDict = Dict(
     end,
 
     "BYE" => (str::AbstractString, pst::PlayState) -> begin
-
+        push!(pst.dropped, parsekey((s)->Seat(parse(Int,s)), "who", str))
         return playerdc
     end
 )
 #end
-
-function GameResults(owari::AbstractString)
-
-    result = split(match(r"owari=\"(?<str>[^\"]+)\""s, owari)[:str], ",")
-
-    scores = Int32[]
-    okauma = Float32[]
-
-    for index in range(1, length(result); step = 2)
-        push!(scores, parse(Int32, result[index]))
-        push!(okauma, parse(Float32, result[index+1]))
-    end
-end

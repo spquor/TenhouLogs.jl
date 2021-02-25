@@ -49,15 +49,13 @@ struct Rules
 end
 
 struct Table
-    names::     Vector{String}
+    names::     Vector{AbstractString}
     ranks::     Vector{Dan}
     rates::     Vector{Float32}
     sexes::     Vector{Char}
 end
 
-abstract type Result end
-
-struct RoundWin <: Result
+struct RoundWin
     value::     Int32
     hanfu::     Tuple{Int8,Int8}
     limit::     Limit
@@ -68,14 +66,13 @@ struct RoundWin <: Result
     provider::  Seat
 end
 
-struct RoundTie <: Result
+struct RoundTie
     tierule::   Ryuukyoku
     reveal::    Vector{Seat}
 end
 
-struct GameOver <: Result
-    scores::    Vector{Int32}
-    okauma::    Vector{Float32}
+if !( @isdefined Result )
+    const Result = Union{RoundWin,RoundTie,Nothing}
 end
 
 mutable struct PlayState
@@ -96,6 +93,7 @@ mutable struct PlayState
     hands::     Vector{Tiles}
     melds::     Vector{Melds}
     ponds::     Vector{Tiles}
+    dropped::   Vector{Seat}
     result::    Result
 end
 
