@@ -11,11 +11,12 @@
 
 @enum Limit nolimit mangan haneman baiman sanbaiman yakuman
 
+@enum HandState open closed fixed
+@enum Play チー ポン 大明槓 小明槓 暗槓 キタ
+
 @enum Round 東一 東二 東三 東四 南一 南二 南三 南四 西一 西二 西三 西四
 @enum Dice ⚀ ⚁ ⚂ ⚃ ⚄ ⚅
-
 @enum Seat 東家 南家 西家 北家
-@enum Play リーチ ツモ ロン チー ポン カン
 
 
 struct Tile
@@ -28,9 +29,7 @@ if !( @isdefined Tiles )
 end
 
 struct Meld
-    called::    Tile
     play::      Play
-    from::      Seat
     with::      Vector{Tile}
 end
 
@@ -82,9 +81,10 @@ mutable struct PlayState
 
     rules::     Rules
     table::     Table
+    dced::      Vector{Seat}
+    turn::      Int8
     round::     Round
     rolls::     Tuple{Dice,Dice}
-    turn::      Int8
     dealer::    Seat
     repeat::    Int8
     riichi::    Int8
@@ -92,8 +92,10 @@ mutable struct PlayState
     scores::    Vector{Int32}
     hands::     Vector{Tiles}
     melds::     Vector{Melds}
-    ponds::     Vector{Tiles}
-    dropped::   Vector{Seat}
+    discard::   Vector{Tiles}
+    tedashi::   Vector{Tiles}
+    flipped::   Vector{Tiles}
+    status::    Vector{HandState}
     result::    Result
 end
 

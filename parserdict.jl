@@ -9,7 +9,7 @@ ParserDict = Dict(
     "GO" => (str::AbstractString, pst::PlayState) -> begin
 
         function getbits(code)
-            digits(parse(Int, code), base = 2, pad = 8)
+            digits(parse(Int, code); base = 2, pad = 8)
         end
 
         bits = map(Bool, parsekey(getbits, "type", str))
@@ -37,8 +37,8 @@ ParserDict = Dict(
 
         if length(names) == 1
             nameindex = findfirst(isequal(names[1]), pst.table.names) - 1
-            seatindex = findfirst(isequal(Seat(nameindex)), pst.dropped)
-            popat!(pst.dropped, seatindex)
+            seatindex = findfirst(isequal(Seat(nameindex)), pst.dced)
+            deleteat!(pst.dced, seatindex)
             return noevents
         end
 
@@ -47,7 +47,7 @@ ParserDict = Dict(
         sexes = splitkey((s)->(s[1]), "sx", str)
 
         pst.table = Table(names, ranks, rates, sexes)
-        pst.dropped = Seat[]
+        pst.dced = Seat[]
 
         return matchset
     end,
@@ -58,7 +58,7 @@ ParserDict = Dict(
                 splitkey((s)->(s), "seed", str)
         number, pst.repeat, pst.riichi, dice01, dice02 =
                 map((s)-> s[1] - '0', roundseed)
-        doraid = [Wall[roundseed[end]]]
+        pst.doraid = [Wall[roundseed[end]]]
 
         pst.round = Round(number)
         pst.rolls = Dice(dice01), Dice(dice02)
@@ -77,7 +77,10 @@ ParserDict = Dict(
 
         pst.hands = haipai
         pst.melds = [Melds[] for i in 1:4]
-        pst.ponds = [Tiles[] for i in 1:4]
+        pst.discard = [Tiles[] for i in 1:4]
+        pst.tedashi = [Tiles[] for i in 1:4]
+        pst.flipped = [Tiles[] for i in 1:4]
+        pst.status = [closed for i in 1:4]
         pst.result = nothing
 
         return roundinit
@@ -163,45 +166,115 @@ ParserDict = Dict(
 
     "D" => (str::AbstractString, pst::PlayState) -> begin
         tileindex = findfirst(isequal(Wall[str]), pst.hands[1])
-        push!(pst.ponds[1], popat!(pst.hands[1], tileindex))
+        deleteat!(pst.hands[1], tileindex)
+        push!(pst.discard[1], Wall[str])
+        (tileindex != 14) && push!(pst.tedashi[1], Wall[str])
         return tiledrop
     end,
 
     "E" => (str::AbstractString, pst::PlayState) -> begin
         tileindex = findfirst(isequal(Wall[str]), pst.hands[2])
-        push!(pst.ponds[2], popat!(pst.hands[2], tileindex))
+        deleteat!(pst.hands[2], tileindex)
+        push!(pst.discard[2], Wall[str])
+        (tileindex != 14) && push!(pst.tedashi[2], Wall[str])
         return tiledrop
     end,
 
     "F" => (str::AbstractString, pst::PlayState) -> begin
         tileindex = findfirst(isequal(Wall[str]), pst.hands[3])
-        push!(pst.ponds[3], popat!(pst.hands[3], tileindex))
+        deleteat!(pst.hands[3], tileindex)
+        push!(pst.discard[3], Wall[str])
+        (tileindex != 14) && push!(pst.tedashi[3], Wall[str])
         return tiledrop
     end,
 
     "G" => (str::AbstractString, pst::PlayState) -> begin
         tileindex = findfirst(isequal(Wall[str]), pst.hands[4])
-        push!(pst.ponds[4], popat!(pst.hands[4], tileindex))
+        deleteat!(pst.hands[4], tileindex)
+        push!(pst.discard[4], Wall[str])
+        (tileindex != 14) && push!(pst.tedashi[4], Wall[str])
         return tiledrop
     end,
 
     "N" => (str::AbstractString, pst::PlayState) -> begin
+
+        code = parsekey((s)->parse(Int, s), "m", str)
+
+        if (code & 0x4 != 0) # chii
+
+            base, call = divrem(code >> 10, 3)
+            suit, base = divrem(base, 7)
+
+            tls = [
+                Tile(Rank(base + 0), Suit(suit)),
+                Tile(Rank(base + 1), Suit(suit)),
+                Tile(Rank(base + 2), Suit(suit))
+            ]
+
+            meld = Meld(チー, tls)
+
+        elseif (code & 0x8 != 0) # pon
+
+            base, call = divrem(code >> 9, 3)
+            suit, base = divrem(base, 9)
+
+            tile = Tile(Rank(base), Suit(suit))
+            tls = [ tile, tile, tile ]
+
+            meld = Meld(ポン, tls)
+
+        elseif (code & 0x10 != 0) # chakan
+
+            base, call = divrem(code >> 9, 3)
+            suit, base = divrem(base, 9)
+
+            tile = Tile(Rank(base), Suit(suit))
+            tls = [ tile, tile, tile, tile ]
+
+            meld = Meld(大明槓, tls)
+
+        elseif (code & 0x20 != 0) # peinuk
+
+            meld = Meld(キタ, [])
+
+        else # ankan
+
+            base, call = divrem(code >> 8, 4)
+            suit, base = divrem(base, 9)
+
+            tile = Tile(Rank(base), Suit(suit))
+            tls = [ tile, tile, tile, tile ]
+
+            meld = Meld(小明槓, tls)
+
+        end
+
+        push!(pst.melds[code & 0x3 + 1], meld)
 
         return tilecall
     end,
 
     "REACH" => (str::AbstractString, pst::PlayState) -> begin
 
+        who = parsekey((s)->parse(Int,s), "who", str) + 1
+
+        if parsekey((s)->(parse(Int,s) == 1), "step", str)
+            pst.status[who] = fixed
+        else
+            pst.scores[who] -= 1000
+            push!(pst.flipped[who], pst.discard[who][end])
+        end
+
         return tilecall
     end,
 
     "DORA" => (str::AbstractString, pst::PlayState) -> begin
-
+        push!(pst.doraid, parsekey((s)->Wall[s], "hai", str))
         return noevents
     end,
 
     "BYE" => (str::AbstractString, pst::PlayState) -> begin
-        push!(pst.dropped, parsekey((s)->Seat(parse(Int,s)), "who", str))
+        push!(pst.dced, parsekey((s)->Seat(parse(Int,s)), "who", str))
         return playerdc
     end
 )
