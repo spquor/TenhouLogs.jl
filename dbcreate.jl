@@ -36,7 +36,7 @@ end
 
 function getLogContent(m::RegexMatch)
 
-    logid::String = m[:id]
+    logid::AbstractString = m[:id]
 
     datetime = Dates.datetime2epochms(DateTime(
             parse(Int, logid[1:4]),
@@ -47,7 +47,7 @@ function getLogContent(m::RegexMatch)
         ))
 
     buffer = IOBuffer()
-    retry(Downloads.download, delays = [0.2, 0.5, 1, 2, 3])(
+    retry(Downloads.download; delays = [0.2, 0.5, 1, 2, 3])(
             "http://tenhou.net/0/log/?" * logid, buffer
         )
 

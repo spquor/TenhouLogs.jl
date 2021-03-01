@@ -27,8 +27,8 @@ ParserDict = Dict(
 
     "UN" => (str::AbstractString, pst::PlayState) -> begin
 
-        names = AbstractString[]
-        for namekey in ["n0", "n1", "n2", "n3"]
+        names = String[]
+        for namekey in ("n0", "n1", "n2", "n3")
             name = parsekey((s)->decodeuri(s), namekey, str)
             if !isnothing(name)
                 push!(names, name)
@@ -37,16 +37,15 @@ ParserDict = Dict(
 
         if length(names) == 1
             nameindex = findfirst(isequal(names[1]), pst.table.names) - 1
-            seatindex = findfirst(isequal(Seat(nameindex)), pst.dced)
+            seatindex = findfirst(isequal(Seat(nameindex)), pst.dced) + 0
             deleteat!(pst.dced, seatindex)
             return noevents
         end
 
-        ranks = splitkey((s)->Dan(parse(Int,s)), "dan", str)
-        rates = splitkey((s)->parse(Float32,s), "rate", str)
-        sexes = splitkey((s)->(s[1]), "sx", str)
-
-        pst.table = Table(names, ranks, rates, sexes)
+        pst.table = Table(names,
+            splitkey((s)->Dan(parse(Int,s)), "dan", str),
+            splitkey((s)->parse(Float32,s), "rate", str),
+            splitkey((s)->(s[1]), "sx", str))
         pst.dced = Seat[]
 
         return matchset
@@ -60,16 +59,16 @@ ParserDict = Dict(
                 map((s)-> s[1] - '0', roundseed)
         pst.doraid = [Wall[roundseed[end]]]
 
+        pst.turn = 0
         pst.round = Round(number)
         pst.rolls = Dice(dice01), Dice(dice02)
-        pst.turn = 0
 
         pst.dealer = parsekey((s)->Seat(parse(Int,s)), "oya", str)
         pst.scores = splitkey((s)->parse(Int32,s), "ten", str)
 
         haipai = Tiles[]
-        for haikey in ["hai0", "hai1", "hai2", "hai3"]
-            hai = splitkey(haikey, str) do s Wall[s] end
+        for haikey in ("hai0", "hai1", "hai2", "hai3")
+            hai::Tiles = splitkey((s)->Wall[s], haikey, str)
             if !isnothing(hai)
                 push!(haipai, hai)
             end
@@ -88,19 +87,20 @@ ParserDict = Dict(
 
     "AGARI" => (str::AbstractString, pst::PlayState) -> begin
 
-        fu, pt, lh = splitkey((s)->parse(Int, s), "ten", str)
+        fu, pt, lh = Vector{Int}(splitkey((s)->parse(Int, s), "ten", str))
+
+        yaku = Tuple{Yaku,Int8}[]
 
         if occursin("yakuman", str)
-            combo = splitkey((s)->parse(Int, s), "yakuman", str)
-            yaku = [
-                ( Yaku(combo[1]), 13 )
-            ]
+            ykm::Vector{Int} = splitkey((s)->parse(Int, s), "yakuman", str)
+            for index in range(1, length(ykm); step = 1)
+                push!(yaku, (Yaku(ykm[index]), 13))
+            end
         else
-            combo = splitkey((s)->parse(Int, s), "yaku", str)
-            yaku = [
-                (   Yaku(combo[index]), combo[index + 1]    )
-                for index in range(1,length(combo); step = 2)
-            ]
+            yku::Vector{Int} = splitkey((s)->parse(Int, s), "yaku", str)
+            for index in range(1, length(yku); step = 2)
+                push!(yaku, (Yaku(yku[index]), yku[index + 1]))
+            end
         end
 
         han = mapreduce(x->x[2], +, yaku)
@@ -112,23 +112,23 @@ ParserDict = Dict(
             ura = Tile[]
         end
 
-        w = parsekey((s)->Seat(parse(Int,s)), "who", str)
-        f = parsekey((s)->Seat(parse(Int,s)), "fromWho", str)
-
         pst.scores = splitkey((s)->parse(Int32,s), "sc", str)
-        pst.result = RoundWin(pt, (han, fu), Limit(lh), yaku, dora, ura, w, f)
+        pst.result = RoundWin(pt, (han, fu), Limit(lh), yaku, dora, ura,
+            parsekey((s)->Seat(parse(Int,s)), "who", str),
+            parsekey((s)->Seat(parse(Int,s)), "fromWho", str)
+        )
 
         return roundwin
     end,
 
     "RYUUKYOKU" => (str::AbstractString, pst::PlayState) -> begin
 
-        tierule = tsuujou
+        tierule::Ryuukyoku = tsuujou
         reveal = Seat[]
 
         if occursin("type", str)
             gettierule(s) = Ryuukyoku(findfirst(isequal(s),
-                ["yao9", "reach4", "ron3", "kan4", "kaze4", "nm"]
+                ("yao9", "reach4", "ron3", "kan4", "kaze4", "nm")
             ))
             tierule = parsekey(gettierule, "type", str)
         end

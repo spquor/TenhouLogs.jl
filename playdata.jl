@@ -2,8 +2,8 @@
 @enum Lobby 一般 上級 特上 鳳凰
 @enum Dan 新人 九級 八級 七級 六級 五級 四級 三級 二級 一級 初段 二段 三段 四段 五段 六段 七段 八段 九段 十段 天鳳位
 
-@enum Suit 萬子 筒子 索子 字牌
-@enum Rank 一 二 三 四 五 六 七 八 九 東 南 西 北 白 發 中
+@enum Suit::Int8 萬子 筒子 索子 字牌
+@enum Rank::Int8 一 二 三 四 五 六 七 八 九 東 南 西 北 白 發 中
 
 @enum Yaku mentsumo riichi ippatsu chankan rinshan haitei houtei pinfu tanyao ipeiko tonpai nanpai xiapai peipai tonhai nanhai xiahai peihai haku hatsu chun daburii chiitoitsu chanta ittsu sandoujun sandoukou sankantsu toitoi sanankou shousangen honroutou ryanpeikou junchan honitsu chinitsu renhou tenhou chihou daisangen suuankou suuankoutanki tsuuiisou ryuuiisou chinroutou chuurenpouto junseichuurenpouto kokushi kokushijuusan daisuushi shousuushi suukantsu dora uradora akadora
 
@@ -48,7 +48,7 @@ struct Rules
 end
 
 struct Table
-    names::     Vector{AbstractString}
+    names::     Vector{String}
     ranks::     Vector{Dan}
     rates::     Vector{Float32}
     sexes::     Vector{Char}
