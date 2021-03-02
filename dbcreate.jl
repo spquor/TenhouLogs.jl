@@ -85,7 +85,7 @@ function buildLogDatabase(indexpath::String, dbpath::String, gametype::String)
             matches = collect(eachmatch(rx, subindex))
             DBInterface.execute(beginsql)
             @sync for match in matches
-                @async DBInterface.execute(insertind, getLogContent(match))
+                @async DBInterface.execute(insertrec, getLogContent(match))
             end
 
             # append subindex information
