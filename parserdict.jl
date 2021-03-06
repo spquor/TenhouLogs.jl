@@ -55,12 +55,12 @@ ParserDict = Dict(
 
         roundseed::Vector{SubString{String}} =
                 splitkey((s)->(s), "seed", str)
-        number, pst.repeat, pst.riichi, dice01, dice02 =
+        number, pst.honba, pst.riichi, dice01, dice02 =
                 map((s)-> s[1] - '0', roundseed)
         pst.doraid = [Wall[roundseed[end]]]
 
         pst.turn = 0
-        pst.round = Round(number)
+        pst.cycle = Round(number)
         pst.rolls = Dice(dice01), Dice(dice02)
 
         pst.dealer = parsekey((s)->Seat(parse(Int,s)), "oya", str)
@@ -87,17 +87,17 @@ ParserDict = Dict(
 
     "AGARI" => (str::AbstractString, pst::PlayState) -> begin
 
-        fu, pt, lh = Vector{Int}(splitkey((s)->parse(Int, s), "ten", str))
+        fu, pt, lh = Vector{Int}(splitkey((s)->parse(Int,s), "ten", str))
 
         yaku = Tuple{Yaku,Int8}[]
 
         if occursin("yakuman", str)
-            ykm::Vector{Int} = splitkey((s)->parse(Int, s), "yakuman", str)
+            ykm::Vector{Int} = splitkey((s)->parse(Int,s), "yakuman", str)
             for index in range(1, length(ykm); step = 1)
                 push!(yaku, (Yaku(ykm[index]), 13))
             end
         else
-            yku::Vector{Int} = splitkey((s)->parse(Int, s), "yaku", str)
+            yku::Vector{Int} = splitkey((s)->parse(Int,s), "yaku", str)
             for index in range(1, length(yku); step = 2)
                 push!(yaku, (Yaku(yku[index]), yku[index + 1]))
             end
@@ -105,8 +105,8 @@ ParserDict = Dict(
 
         han = mapreduce(x->x[2], +, yaku)
 
-        dora = splitkey("doraHai", str) do x Wall[x] end
-        ura = splitkey("doraHaiUra", str) do x Wall[x] end
+        dora = splitkey((s)->Wall[s], "doraHai", str)
+        ura = splitkey((s)->Wall[s], "doraHaiUra", str)
 
         if isnothing(ura)
             ura = Tile[]
@@ -198,7 +198,8 @@ ParserDict = Dict(
 
     "N" => (str::AbstractString, pst::PlayState) -> begin
 
-        code = parsekey((s)->parse(Int, s), "m", str)
+        code = parsekey((s)->parse(Int,s), "m", str)
+        who = parsekey((s)->parse(Int,s), "who", str) + 1
 
         if (code & 0x4 != 0) # chii
 
@@ -249,6 +250,7 @@ ParserDict = Dict(
 
         end
 
+        pst.status[who] = opened
         push!(pst.melds[code & 0x3 + 1], meld)
 
         return tilecall
