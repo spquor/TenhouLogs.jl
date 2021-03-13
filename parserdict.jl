@@ -12,6 +12,8 @@ if !( @isdefined ParserDict )
     }
 
     function draw(str::AbstractString, pst::PlayState, i::Int)
+
+        pst.turn = pst.turn + 1
         pst.hands[i][end] = Wall[str]
     end
 
@@ -21,11 +23,14 @@ if !( @isdefined ParserDict )
         pst.discard[i][dropindex] = Wall[str]
 
         if !isequal(pst.hands[i][end], Wall[str])
+
             dropindex = findfirst(isequal(missing), pst.tedashi[i])
             pst.tedashi[i][dropindex] = Wall[str]
+
             tileindex = findfirst(isequal(Wall[str]), pst.hands[i])
             pst.hands[i][tileindex] = pst.hands[i][end]
         end
+
         pst.hands[i][end] = missing
     end
 
@@ -232,8 +237,12 @@ if !( @isdefined ParserDict )
 
     "N" => (str::AbstractString, pst::PlayState) -> begin
 
-        code = parsekey((s)->parse(Int,s), "m", str)
+        code = parsekey((s)->parse(Int,s), "m", str) + 0
         who = parsekey((s)->parse(Int,s), "who", str) + 1
+        from = mod(who + code & 0x3, 1:4)
+
+        tls = Tile[]
+        play = チー
 
         if (code & 0x4 != 0) # chii
 
@@ -246,45 +255,74 @@ if !( @isdefined ParserDict )
                 Tile(Rank(base + 2), Suit(suit))
             ]
 
-            meld = Meld(チー, tls)
-
         elseif (code & 0x8 != 0) # pon
 
             base, call = divrem(code >> 9, 3)
             suit, base = divrem(base, 9)
+            (suit == 3) && (base = base + 9)
 
             tile = Tile(Rank(base), Suit(suit))
             tls = [ tile, tile, tile ]
 
-            meld = Meld(ポン, tls)
+            play = ポン
 
         elseif (code & 0x10 != 0) # chakan
 
             base, call = divrem(code >> 9, 3)
             suit, base = divrem(base, 9)
+            (suit == 3) && (base = base + 9)
 
             tile = Tile(Rank(base), Suit(suit))
             tls = [ tile, tile, tile, tile ]
 
-            meld = Meld(大明槓, tls)
+            play = 大明槓
 
         elseif (code & 0x20 != 0) # peinuk
 
-            meld = Meld(キタ, [])
+            call = 0
+            tls = [Tile(北, 字牌)]
+            play = キタ
 
         else # ankan
 
             base, call = divrem(code >> 8, 4)
             suit, base = divrem(base, 9)
+            (suit == 3) && (base = base + 9)
 
             tile = Tile(Rank(base), Suit(suit))
             tls = [ tile, tile, tile, tile ]
 
-            meld = Meld(小明槓, tls)
-
+            play = from == who ? 暗槓 : 小明槓
         end
 
-        pst.status[code & 0x3 + 1] = opened
+        meld = Meld(play, Seat(from-1), tls[call+1], tls)
+
+        if (meld.play != 大明槓)
+
+            for i in eachindex(tls)
+                if i != (call+1)
+                    tileindex = findfirst(isequal(tls[i]), pst.hands[who])
+                    (pst.hands[who][tileindex] = missing)
+                end
+            end
+
+            meldindex = findfirst(isequal(missing), pst.melds[who])
+            pst.melds[who][meldindex] = meld
+        else
+
+            meldindex = findfirst((x)->(x.tile == meld.tile), pst.melds[who])
+            pst.melds[who][meldindex] = meld
+        end
+
+        if !ismissing(pst.hands[who][end])
+            tileindex = findfirst(isequal(tls[call+1]), pst.hands[who])
+            pst.hands[who][tileindex] = pst.hands[who][end]
+            pst.hands[who][end] = missing
+        end
+
+        if (meld.play != 暗槓)
+            pst.status[who] = opened
+        end
 
         return opencall
     end,

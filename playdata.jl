@@ -30,6 +30,8 @@ end
 
 struct Meld
     play::      Play
+    from::      Seat
+    tile::      Tile
     with::      Vector{Tile}
 end
 

@@ -37,6 +37,7 @@ function queryLog(dbpath::String, logidx::Int)
     )
 
     # decompress tenhou log contents and return processed table
+    # println("http://tenhou.net/0/?log=", table.id[logidx])
     return String(
         transcode(LZ4FrameDecompressor, table.content[logidx])
     )
@@ -56,7 +57,7 @@ function queryLogs(dbpath::String)
 
     # decompress tenhou log contents and return processed table
     for i = 1:1000
-        # @show i table.id[i]
+        # println(i, "\t|\t", "http://tenhou.net/0/?log=", table.id[i])
         analyseLog(String(
             transcode(LZ4FrameDecompressor, table.content[i])
         ))
