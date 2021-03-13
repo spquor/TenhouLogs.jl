@@ -52,7 +52,8 @@ function parsekey(parser::Function, key::AbstractString, str::AbstractString)
     return parser(str[state+1:endq-1])
 end
 
-function splitkey(parser::Function, key::AbstractString, str::AbstractString)
+function splitkey(parser::Function, key::AbstractString, str::AbstractString,
+        result::AbstractVector = [], pushindex::Integer = 1)
 
     keyrange = findfirst(key, str)
     if keyrange == nothing
@@ -63,12 +64,19 @@ function splitkey(parser::Function, key::AbstractString, str::AbstractString)
     state::Int = keyrange[end] + 2
     endq::Int = findnext(isequal('\"'), str, state + 1)
 
-    result = []
-
-    while state != endq
-        nextbrk::Int = findnext(brk, str, state + 1)
-        push!(result, parser(str[state+1:nextbrk-1]))
-        state = nextbrk
+    if (length(result) == 0)
+        while state != endq
+            nextbrk::Int = findnext(brk, str, state + 1)
+            push!(result, parser(str[state+1:nextbrk-1]))
+            state = nextbrk
+        end
+    else
+        while state != endq
+            nextbrk::Int = findnext(brk, str, state + 1)
+            result[pushindex] = parser(str[state+1:nextbrk-1])
+            pushindex = pushindex + 1
+            state = nextbrk
+        end
     end
 
     return result

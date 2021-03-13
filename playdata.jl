@@ -25,7 +25,7 @@ struct Tile
 end
 
 if !( @isdefined Tiles )
-    const Tiles = Vector{Tile}
+    const Tiles = Vector{Union{Tile,Missing}}
 end
 
 struct Meld
@@ -34,7 +34,7 @@ struct Meld
 end
 
 if !( @isdefined Melds )
-    const Melds = Vector{Meld}
+    const Melds = Vector{Union{Meld,Missing}}
 end
 
 struct Rules

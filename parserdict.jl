@@ -1,10 +1,35 @@
+using FunctionWrappers
+
 include("playdata.jl")
 include("utility.jl")
 
-@enum MatchEvent noevents matchset roundinit roundwin roundtie matchend tiledraw tiledrop tilecall playerdc
+@enum MatchEvent noevents matchset roundinit roundwin roundtie matchend tiledraw tiledrop opencall riichicall doraflip playerdc playerin
 
-#if !( @isdefined ParserDict ) const
-ParserDict = Dict(
+if !( @isdefined ParserDict )
+
+    const Parser = FunctionWrappers.FunctionWrapper{
+        MatchEvent, Tuple{String,PlayState}
+    }
+
+    function draw(str::AbstractString, pst::PlayState, i::Int)
+        pst.hands[i][end] = Wall[str]
+    end
+
+    function drop(str::AbstractString, pst::PlayState, i::Int)
+
+        dropindex = findfirst(isequal(missing), pst.discard[i])
+        pst.discard[i][dropindex] = Wall[str]
+
+        if !isequal(pst.hands[i][end], Wall[str])
+            dropindex = findfirst(isequal(missing), pst.tedashi[i])
+            pst.tedashi[i][dropindex] = Wall[str]
+            tileindex = findfirst(isequal(Wall[str]), pst.hands[i])
+            pst.hands[i][tileindex] = pst.hands[i][end]
+        end
+        pst.hands[i][end] = missing
+    end
+
+    const ParserDict = Dict{String,Parser}(
 
     "GO" => (str::AbstractString, pst::PlayState) -> begin
 
@@ -27,26 +52,37 @@ ParserDict = Dict(
 
     "UN" => (str::AbstractString, pst::PlayState) -> begin
 
-        names = String[]
+        namaes = String[]
         for namekey in ("n0", "n1", "n2", "n3")
             name = parsekey((s)->decodeuri(s), namekey, str)
             if !isnothing(name)
-                push!(names, name)
+                push!(namaes, name)
             end
         end
 
-        if length(names) == 1
-            nameindex = findfirst(isequal(names[1]), pst.table.names) - 1
+        if length(namaes) == 1
+            nameindex = findfirst(isequal(namaes[1]), pst.table.namaes) - 1
             seatindex = findfirst(isequal(Seat(nameindex)), pst.dced) + 0
             deleteat!(pst.dced, seatindex)
-            return noevents
+            return playerin
         end
 
-        pst.table = Table(names,
+        pst.table = Table(namaes,
             splitkey((s)->Dan(parse(Int,s)), "dan", str),
             splitkey((s)->parse(Float32,s), "rate", str),
             splitkey((s)->(s[1]), "sx", str))
         pst.dced = Seat[]
+
+        playercount = length(pst.table.namaes)
+
+        pst.hands = [Tiles(undef, 14) for i in 1:playercount]
+        pst.melds = [Melds(undef, 8) for i in 1:playercount]
+        pst.discard = [Tiles(undef, 32) for i in 1:playercount]
+        pst.tedashi = [Tiles(undef, 32) for i in 1:playercount]
+        pst.flipped = [Tiles(undef, 1) for i in 1:playercount]
+
+        pst.scores = Vector{Int32}(undef, playercount)
+        pst.status = Vector{State}(undef, playercount)
 
         return matchset
     end,
@@ -64,22 +100,24 @@ ParserDict = Dict(
         pst.rolls = Dice(dice01), Dice(dice02)
 
         pst.dealer = parsekey((s)->Seat(parse(Int,s)), "oya", str)
-        pst.scores = splitkey((s)->parse(Int32,s), "ten", str)
+        splitkey((s)->parse(Int32,s), "ten", str, pst.scores)
 
-        haipai = Tiles[]
-        for haikey in ("hai0", "hai1", "hai2", "hai3")
-            hai::Tiles = splitkey((s)->Wall[s], haikey, str)
-            if !isnothing(hai)
-                push!(haipai, hai)
-            end
+        playercount = length(pst.table.namaes)
+        haikey = ("hai0", "hai1", "hai2", "hai3")
+
+        for i in 1:playercount
+            fill!(pst.hands[i], missing)
+            fill!(pst.melds[i], missing)
+            fill!(pst.discard[i], missing)
+            fill!(pst.tedashi[i], missing)
+            fill!(pst.flipped[i], missing)
+            splitkey(
+                (s)->Wall[s], haikey[i],
+                    str, pst.hands[i]
+            )
         end
 
-        pst.hands = haipai
-        pst.melds = [Melds[] for i in 1:4]
-        pst.discard = [Tiles[] for i in 1:4]
-        pst.tedashi = [Tiles[] for i in 1:4]
-        pst.flipped = [Tiles[] for i in 1:4]
-        pst.status = [closed for i in 1:4]
+        fill!(pst.status, closed)
         pst.result = nothing
 
         return roundinit
@@ -112,7 +150,11 @@ ParserDict = Dict(
             ura = Tile[]
         end
 
-        pst.scores = splitkey((s)->parse(Int32,s), "sc", str)
+        sc::Vector{Int32} = splitkey((s)->parse(Int32,s), "sc", str)
+        for i::Int in 1:length(sc)÷2
+            pst.scores[i] = sc[1 + 2*(i-1)] + sc[2 + 2*(i-1)]
+        end
+
         pst.result = RoundWin(pt, (han, fu), Limit(lh), yaku, dora, ura,
             parsekey((s)->Seat(parse(Int,s)), "who", str),
             parsekey((s)->Seat(parse(Int,s)), "fromWho", str)
@@ -138,61 +180,53 @@ ParserDict = Dict(
         occursin("hai2", str) && push!(reveal, Seat(2))
         occursin("hai3", str) && push!(reveal, Seat(3))
 
-        pst.scores = splitkey((s)->parse(Int32,s), "sc", str)
+        sc::Vector{Int32} = splitkey((s)->parse(Int32,s), "sc", str)
+        for i::Int in 1:length(sc)÷2
+            pst.scores[i] = sc[1 + 2*(i-1)] + sc[2 + 2*(i-1)]
+        end
+
         pst.result = RoundTie(tierule, reveal)
 
         return roundtie
     end,
 
     "T" => (str::AbstractString, pst::PlayState) -> begin
-        push!(pst.hands[1], Wall[str])
+        draw(str, pst, 1)
         return tiledraw
     end,
 
     "U" => (str::AbstractString, pst::PlayState) -> begin
-        push!(pst.hands[2], Wall[str])
+        draw(str, pst, 2)
         return tiledraw
     end,
 
     "V" => (str::AbstractString, pst::PlayState) -> begin
-        push!(pst.hands[3], Wall[str])
+        draw(str, pst, 3)
         return tiledraw
     end,
 
     "W" => (str::AbstractString, pst::PlayState) -> begin
-        push!(pst.hands[4], Wall[str])
+        draw(str, pst, 4)
         return tiledraw
     end,
 
     "D" => (str::AbstractString, pst::PlayState) -> begin
-        tileindex = findfirst(isequal(Wall[str]), pst.hands[1])
-        deleteat!(pst.hands[1], tileindex)
-        push!(pst.discard[1], Wall[str])
-        (tileindex != 14) && push!(pst.tedashi[1], Wall[str])
+        drop(str, pst, 1)
         return tiledrop
     end,
 
     "E" => (str::AbstractString, pst::PlayState) -> begin
-        tileindex = findfirst(isequal(Wall[str]), pst.hands[2])
-        deleteat!(pst.hands[2], tileindex)
-        push!(pst.discard[2], Wall[str])
-        (tileindex != 14) && push!(pst.tedashi[2], Wall[str])
+        drop(str, pst, 2)
         return tiledrop
     end,
 
     "F" => (str::AbstractString, pst::PlayState) -> begin
-        tileindex = findfirst(isequal(Wall[str]), pst.hands[3])
-        deleteat!(pst.hands[3], tileindex)
-        push!(pst.discard[3], Wall[str])
-        (tileindex != 14) && push!(pst.tedashi[3], Wall[str])
+        drop(str, pst, 3)
         return tiledrop
     end,
 
     "G" => (str::AbstractString, pst::PlayState) -> begin
-        tileindex = findfirst(isequal(Wall[str]), pst.hands[4])
-        deleteat!(pst.hands[4], tileindex)
-        push!(pst.discard[4], Wall[str])
-        (tileindex != 14) && push!(pst.tedashi[4], Wall[str])
+        drop(str, pst, 4)
         return tiledrop
     end,
 
@@ -250,10 +284,9 @@ ParserDict = Dict(
 
         end
 
-        pst.status[who] = opened
-        push!(pst.melds[code & 0x3 + 1], meld)
+        pst.status[code & 0x3 + 1] = opened
 
-        return tilecall
+        return opencall
     end,
 
     "REACH" => (str::AbstractString, pst::PlayState) -> begin
@@ -264,20 +297,36 @@ ParserDict = Dict(
             pst.status[who] = fixed
         else
             pst.scores[who] -= 1000
-            push!(pst.flipped[who], pst.discard[who][end])
+            pst.flipped[who][begin] = pst.discard[who][end]
         end
 
-        return tilecall
+        return riichicall
     end,
 
     "DORA" => (str::AbstractString, pst::PlayState) -> begin
         push!(pst.doraid, parsekey((s)->Wall[s], "hai", str))
-        return noevents
+        return doraflip
     end,
 
     "BYE" => (str::AbstractString, pst::PlayState) -> begin
         push!(pst.dced, parsekey((s)->Seat(parse(Int,s)), "who", str))
         return playerdc
+    end,
+
+    "SHUFFLE" => (str::AbstractString, pst::PlayState) -> begin
+        return noevents
+    end,
+
+    "TAIKYOKU" => (str::AbstractString, pst::PlayState) -> begin
+        return noevents
+    end,
+
+    "mjloggm" => (str::AbstractString, pst::PlayState) -> begin
+        return noevents
+    end,
+
+    "" => (str::AbstractString, pst::PlayState) -> begin
+        return matchend
     end
 )
-#end
+end

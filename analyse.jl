@@ -19,12 +19,7 @@ function analyseLog(str::AbstractString)
         tagend::Int = findnext(brk, str, tagbeg)
         status::Int = findnext('>', str, tagend)
 
-        parser = get(ParserDict, str[(tagbeg+1):(tagend-1)], nothing)
-
-        if !isnothing(parser)
-            parser(str[tagend:status-2], playstate)
-        end
-
+        ParserDict[str[(tagbeg+1):(tagend-1)]](str[tagend:status-2], playstate)
     end
 
 end
@@ -61,6 +56,7 @@ function queryLogs(dbpath::String)
 
     # decompress tenhou log contents and return processed table
     for i = 1:1000
+        # @show i table.id[i]
         analyseLog(String(
             transcode(LZ4FrameDecompressor, table.content[i])
         ))
