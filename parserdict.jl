@@ -19,15 +19,17 @@ if !( @isdefined ParserDict )
 
     function drop(str::AbstractString, pst::PlayState, i::Int)
 
-        dropindex = findfirst(isequal(missing), pst.discard[i])
-        pst.discard[i][dropindex] = Wall[str]
+        droppedtile = Wall[str]
 
-        if !isequal(pst.hands[i][end], Wall[str])
+        dropindex = findfirst(isequal(missing), pst.discard[i])
+        pst.discard[i][dropindex] = droppedtile
+
+        if !isequal(pst.hands[i][end], droppedtile)
 
             dropindex = findfirst(isequal(missing), pst.tedashi[i])
-            pst.tedashi[i][dropindex] = Wall[str]
+            pst.tedashi[i][dropindex] = droppedtile
 
-            tileindex = findfirst(isequal(Wall[str]), pst.hands[i])
+            tileindex = findfirst(isequal(droppedtile), pst.hands[i])
             pst.hands[i][tileindex] = pst.hands[i][end]
         end
 
@@ -72,13 +74,16 @@ if !( @isdefined ParserDict )
             return playerin
         end
 
-        pst.table = Table(namaes,
-            splitkey((s)->Dan(parse(Int,s)), "dan", str),
-            splitkey((s)->parse(Float32,s), "rate", str),
-            splitkey((s)->(s[1]), "sx", str))
-        pst.dced = Seat[]
+        playercount = length(namaes)
+        vecranks = Vector{Dan}(undef, playercount)
+        vecrates = Vector{Float32}(undef, playercount)
+        vecsexes = Vector{Char}(undef, playercount)
 
-        playercount = length(pst.table.namaes)
+        pst.table = Table(namaes,
+            splitkey((s)->Dan(parse(Int,s)), "dan", str, vecranks),
+            splitkey((s)->parse(Float32,s), "rate", str, vecrates),
+            splitkey((s)->(s[1]), "sx", str, vecsexes))
+        pst.dced = Seat[]
 
         pst.hands = [Tiles(undef, 14) for i in 1:playercount]
         pst.melds = [Melds(undef, 8) for i in 1:playercount]
@@ -94,8 +99,8 @@ if !( @isdefined ParserDict )
 
     "INIT" => (str::AbstractString, pst::PlayState) -> begin
 
-        roundseed::Vector{SubString{String}} =
-                splitkey((s)->(s), "seed", str)
+        roundseed = splitkey((s)->(s), "seed", str,
+                Vector{SubString{String}}(undef, 6))
         number, pst.honba, pst.riichi, dice01, dice02 =
                 map((s)-> s[1] - '0', roundseed)
         pst.doraid = [Wall[roundseed[end]]]
@@ -130,7 +135,8 @@ if !( @isdefined ParserDict )
 
     "AGARI" => (str::AbstractString, pst::PlayState) -> begin
 
-        fu, pt, lh = Vector{Int}(splitkey((s)->parse(Int,s), "ten", str))
+        fu, pt, lh = splitkey((s)->parse(Int,s), "ten", str,
+                Vector{Int}(undef, 3))
 
         yaku = Tuple{Yaku,Int8}[]
 
@@ -148,16 +154,12 @@ if !( @isdefined ParserDict )
 
         han = mapreduce(x->x[2], +, yaku)
 
-        dora = splitkey((s)->Wall[s], "doraHai", str)
-        ura = splitkey((s)->Wall[s], "doraHaiUra", str)
+        dora = Tile[]; splitkey((s)->Wall[s], "doraHai", str, dora)
+        ura = Tile[]; splitkey((s)->Wall[s], "doraHaiUra", str, ura)
 
-        if isnothing(ura)
-            ura = Tile[]
-        end
-
-        sc::Vector{Int32} = splitkey((s)->parse(Int32,s), "sc", str)
-        for i::Int in 1:length(sc)÷2
-            pst.scores[i] = sc[1 + 2*(i-1)] + sc[2 + 2*(i-1)]
+        sc = splitkey((s)->parse(Int,s), "sc", str, Vector{Int}(undef, 8))
+        for i in range(1, Int(length(sc) / 2); step = 1)
+            pst.scores[i] = pst.scores[i] + sc[2*i]
         end
 
         pst.result = RoundWin(pt, (han, fu), Limit(lh), yaku, dora, ura,
@@ -185,9 +187,9 @@ if !( @isdefined ParserDict )
         occursin("hai2", str) && push!(reveal, Seat(2))
         occursin("hai3", str) && push!(reveal, Seat(3))
 
-        sc::Vector{Int32} = splitkey((s)->parse(Int32,s), "sc", str)
-        for i::Int in 1:length(sc)÷2
-            pst.scores[i] = sc[1 + 2*(i-1)] + sc[2 + 2*(i-1)]
+        sc = splitkey((s)->parse(Int,s), "sc", str, Vector{Int}(undef, 8))
+        for i in range(1, Int(length(sc) / 2); step = 1)
+            pst.scores[i] = pst.scores[i] + sc[2*i]
         end
 
         pst.result = RoundTie(tierule, reveal)
@@ -334,7 +336,7 @@ if !( @isdefined ParserDict )
         if parsekey((s)->(parse(Int,s) == 1), "step", str)
             pst.status[who] = fixed
         else
-            pst.scores[who] -= 1000
+            pst.scores[who] -= 10
             pst.flipped[who][begin] = pst.discard[who][end]
         end
 

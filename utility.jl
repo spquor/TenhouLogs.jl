@@ -64,6 +64,10 @@ function splitkey(parser::Function, key::AbstractString, str::AbstractString,
     state::Int = keyrange[end] + 2
     endq::Int = findnext(isequal('\"'), str, state + 1)
 
+    if endq - state == 1
+        return result
+    end
+
     if (length(result) == 0)
         while state != endq
             nextbrk::Int = findnext(brk, str, state + 1)
