@@ -11,7 +11,7 @@
 
 @enum Limit nolimit mangan haneman baiman sanbaiman yakuman
 
-@enum State opened closed fixed
+@enum State opened closed fixxed
 @enum Play チー ポン 大明槓 小明槓 暗槓 キタ
 
 @enum Round 東一 東二 東三 東四 南一 南二 南三 南四 西一 西二 西三 西四

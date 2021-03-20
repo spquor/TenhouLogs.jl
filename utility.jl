@@ -2,41 +2,24 @@
 function decodeuri(str::AbstractString)
 
     out = IOBuffer()
-    io = IOBuffer(str)
 
-    while !eof(io)
-        c = read(io, Char)
+    status = 1
+    strlen = sizeof(str)
+
+    while status < strlen
+        c = str[status]
         if c == '%'
-            cn = read(io, Char)
-            c = read(io, Char)
-            write(out, parse(UInt8, string(cn, c); base=16))
+            cn = str[status+1]
+            cv = str[status+2]
+            write(out, parse(UInt8, string(cn, cv); base=16))
+            status = status+3
         else
             write(out, c)
+            status = status+1
         end
     end
 
     return String(take!(out))
-end
-
-function rxiterator(rx::Regex, str::AbstractString)
-
-    matches = eachmatch(rx, str)
-    local state = Ref((0, false))
-
-    (rx::Regex = r"") -> begin
-
-        if !iszero(state[][1])
-            m, state[] = iterate(matches, state[])
-        else
-            m, state[] = iterate(matches)
-        end
-
-        while !occursin(rx, m[1])
-            m, state[] = iterate(matches, state[])
-        end
-
-        return m
-    end
 end
 
 function parsekey(parser::Function, key::AbstractString, str::AbstractString)

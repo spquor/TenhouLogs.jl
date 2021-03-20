@@ -1,4 +1,3 @@
-using FunctionWrappers
 
 include("playdata.jl")
 include("utility.jl")
@@ -6,10 +5,6 @@ include("utility.jl")
 @enum MatchEvent noevents matchset roundinit roundwin roundtie matchend tiledraw tiledrop opencall riichicall doraflip playerdc playerin
 
 if !( @isdefined ParserDict )
-
-    const Parser = FunctionWrappers.FunctionWrapper{
-        MatchEvent, Tuple{String,PlayState}
-    }
 
     function draw(str::AbstractString, pst::PlayState, i::Int)
 
@@ -36,7 +31,7 @@ if !( @isdefined ParserDict )
         pst.hands[i][end] = missing
     end
 
-    const ParserDict = Dict{String,Parser}(
+    const ParserDict = Dict(
 
     "GO" => (str::AbstractString, pst::PlayState) -> begin
 
@@ -91,7 +86,6 @@ if !( @isdefined ParserDict )
         pst.tedashi = [Tiles(undef, 32) for i in 1:playercount]
         pst.flipped = [Tiles(undef, 1) for i in 1:playercount]
 
-        pst.doraid = Tiles(undef, 5)
         pst.scores = Vector{Int32}(undef, playercount)
         pst.status = Vector{State}(undef, playercount)
 
@@ -104,13 +98,11 @@ if !( @isdefined ParserDict )
                 Vector{String}(undef, 6))
         number, pst.honba, pst.riichi, dice01, dice02 =
                 map((s)-> s[1] - '0', roundseed)
+        pst.doraid = [Wall[roundseed[end]]]
 
         pst.turn = 0
         pst.cycle = Round(number)
         pst.rolls = Dice(dice01), Dice(dice02)
-
-        fill!(pst.doraid, missing)
-        pst.doraid[1] = Wall[roundseed[end]]
 
         pst.dealer = parsekey((s)->Seat(parse(Int,s)), "oya", str)
         splitkey((s)->parse(Int32,s), "ten", str, pst.scores)
@@ -337,7 +329,7 @@ if !( @isdefined ParserDict )
         who = parsekey((s)->parse(Int,s), "who", str) + 1
 
         if parsekey((s)->parse(Int,s), "step", str) == 1
-            pst.status[who] = fixed
+            pst.status[who] = fixxed
         else
             pst.scores[who] -= 10
             pst.flipped[who][begin] = pst.discard[who][end]
