@@ -2,7 +2,7 @@
 include("playdata.jl")
 include("utility.jl")
 
-@enum MatchEvent noevents matchset roundinit roundwin roundtie matchend tiledraw tiledrop opencall riichicall doraflip playerdc playerin
+@enum MatchEvent noevents matchset roundinit roundwin roundtie matchend tiledraw tiledrop meldcall riichicall doraflip playerdc playerin
 
 if !( @isdefined ParserDict )
 
@@ -122,7 +122,7 @@ if !( @isdefined ParserDict )
             )
         end
 
-        fill!(pst.status, closed)
+        fill!(pst.status, CLOSED)
         pst.result = nothing
 
         return roundinit
@@ -238,77 +238,58 @@ if !( @isdefined ParserDict )
         code = parsekey((s)->parse(Int,s), "m", str) + 0
         from = mod(who + code & 0x3, 1:4)
 
-        tls = Tiles(missing, 4)
-        play = チー
-
         if (code & 0x4 != 0) # chii
 
             base, call = divrem(code >> 10, 3)
             suit, base = divrem(base, 7)
 
-            tls = [
-                Tile(Rank(base + 0), Suit(suit)),
-                Tile(Rank(base + 1), Suit(suit)),
-                Tile(Rank(base + 2), Suit(suit))
-            ]
+            tls = [tileget(suit, base + i, code >> (3+2*i) & 0x3) for i = 0:2]
+
+            play = チー
 
         elseif (code & 0x8 != 0) # pon
 
             base, call = divrem(code >> 9, 3)
             suit, base = divrem(base, 9)
-            (suit == 3) && (base = base + 9)
 
-            tile = Tile(Rank(base), Suit(suit))
-            tls = [ tile, tile, tile ]
+            tls = [tileget(suit, base, i) for i = 0:3 if i != code >> 5 & 0x3]
 
             play = ポン
 
-        elseif (code & 0x10 != 0) # chakan
+        elseif (code & 0x10 != 0) # kan1
 
-            base, call = divrem(code >> 9, 3)
+            base, call = div(code >> 9, 3), 3
             suit, base = divrem(base, 9)
-            (suit == 3) && (base = base + 9)
 
-            tile = Tile(Rank(base), Suit(suit))
-            tls = [ tile, tile, tile, tile ]
+            tls = [tileget(suit, base, i) for i = 0:3 if i != code >> 5 & 0x3]
+                        push!(tls, tileget(suit, base, code >> 5 & 0x3))
 
             play = 大明槓
 
-        elseif (code & 0x20 != 0) # peinuk
+        elseif (code & 0x20 != 0) # pei
 
             call = 0
             tls = [Tile(北, 字牌)]
             play = キタ
 
-        else # ankan
+        else # kan2
 
             base, call = divrem(code >> 8, 4)
             suit, base = divrem(base, 9)
-            (suit == 3) && (base = base + 9)
 
-            tile = Tile(Rank(base), Suit(suit))
-            tls = [ tile, tile, tile, tile ]
+            tls = [tileget(suit, base, i) for i = 0:3]
 
             play = from == who ? 暗槓 : 小明槓
         end
 
-        meld = Meld(play, Seat(from-1), tls[call+1], tls)
+        meldindex = findfirst(isequal(missing), pst.melds[who])
+        pst.melds[who][meldindex] = Meld(play, Seat(from-1), tls[call+1], tls)
 
-        if (meld.play != 大明槓)
-
-            for i in eachindex(tls)
-                if i != (call+1)
-                    tileindex = findfirst(isequal(tls[i]), pst.hands[who])
-                    (pst.hands[who][tileindex] = missing)
-                end
+        if (play != 大明槓)
+            for tile in tls[1:length(tls).!=(call+1)]
+                tileindex = findfirst(isequal(tile), pst.hands[who])
+                (pst.hands[who][tileindex] = missing)
             end
-
-            meldindex = findfirst(isequal(missing), pst.melds[who])
-            pst.melds[who][meldindex] = meld
-        else
-
-            meldindex = findfirst((x)->(x.tile == meld.tile), pst.melds[who])
-            pst.melds[who][meldindex] = meld
         end
 
         if !ismissing(pst.hands[who][end])
@@ -317,11 +298,11 @@ if !( @isdefined ParserDict )
             pst.hands[who][end] = missing
         end
 
-        if (meld.play != 暗槓)
-            pst.status[who] = opened
+        if (play != 暗槓)
+            pst.status[who] = OPENED
         end
 
-        return opencall
+        return meldcall
     end,
 
     "REACH" => (str::AbstractString, pst::PlayState) -> begin
@@ -329,10 +310,11 @@ if !( @isdefined ParserDict )
         who = parsekey((s)->parse(Int,s), "who", str) + 1
 
         if parsekey((s)->parse(Int,s), "step", str) == 1
-            pst.status[who] = fixxed
+            pst.status[who] = RIICHI
         else
             pst.scores[who] -= 10
-            pst.flipped[who][begin] = pst.discard[who][end]
+            tileindex = findfirst(isequal(missing), pst.discard[who])
+            pst.flipped[who][begin] = pst.discard[who][tileindex-1]
         end
 
         return riichicall

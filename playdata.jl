@@ -2,21 +2,19 @@
 @enum Lobby 一般 上級 特上 鳳凰
 @enum Dan 新人 九級 八級 七級 六級 五級 四級 三級 二級 一級 初段 二段 三段 四段 五段 六段 七段 八段 九段 十段 天鳳位
 
-@enum Suit::Int8 萬子 筒子 索子 字牌
-@enum Rank::Int8 一 二 三 四 五 六 七 八 九 東 南 西 北 白 發 中
-
-@enum Yaku mentsumo riichi ippatsu chankan rinshan haitei houtei pinfu tanyao ipeiko tonpai nanpai xiapai peipai tonhai nanhai xiahai peihai haku hatsu chun daburii chiitoitsu chanta ittsu sandoujun sandoukou sankantsu toitoi sanankou shousangen honroutou ryanpeikou junchan honitsu chinitsu renhou tenhou chihou daisangen suuankou suuankoutanki tsuuiisou ryuuiisou chinroutou chuurenpouto junseichuurenpouto kokushi kokushijuusan daisuushi shousuushi suukantsu dora uradora akadora
-
-@enum Ryuukyoku tsuujou yao9 reach4 ron3 kan4 kaze4 nagashi
-
-@enum Limit nolimit mangan haneman baiman sanbaiman yakuman
-
-@enum State opened closed fixxed
-@enum Play チー ポン 大明槓 小明槓 暗槓 キタ
-
 @enum Round 東一 東二 東三 東四 南一 南二 南三 南四 西一 西二 西三 西四
 @enum Dice ⚀ ⚁ ⚂ ⚃ ⚄ ⚅
 @enum Seat 東家 南家 西家 北家
+
+@enum Suit::Int8 萬子 筒子 索子 字牌
+@enum Rank::Int8 赤 一 二 三 四 五 六 七 八 九 東 南 西 北 白 發 中
+
+@enum Yaku mentsumo riichi ippatsu chankan rinshan haitei houtei pinfu tanyao ipeiko tonpai nanpai xiapai peipai tonhai nanhai xiahai peihai haku hatsu chun daburii chiitoitsu chanta ittsu sandoujun sandoukou sankantsu toitoi sanankou shousangen honroutou ryanpeikou junchan honitsu chinitsu renhou tenhou chihou daisangen suuankou suuankoutanki tsuuiisou ryuuiisou chinroutou chuurenpouto junseichuurenpouto kokushi kokushijuusan daisuushi shousuushi suukantsu dora uradora akadora
+@enum Limit nolimit mangan haneman baiman sanbaiman yakuman
+@enum Ryuukyoku tsuujou yao9 reach4 ron3 kan4 kaze4 nagashi
+
+@enum State OPENED CLOSED RIICHI
+@enum Play チー ポン 大明槓 小明槓 暗槓 キタ
 
 
 struct Tile
@@ -101,12 +99,19 @@ mutable struct PlayState
     result::    Result
 end
 
-if !( @isdefined Wall )
-    const Wall = Dict(
-        "$c" => Tile(
-            c < 108 ? Rank(c % 36 ÷ 4) :
-                Rank(c % 36 ÷ 4 + 9),
+@eval function tileget(c::Int)
+    return Tile(
+        (c == 16 || c == 52 || c == 88) ? (赤) :
+            c < 108 ? Rank(c % 36 ÷ 4 + 1) :
+                Rank(c % 36 ÷ 4 + 10),
                     Suit(c ÷ 36)
-        ) for c = 0:135
     )
+end
+
+@inline function tileget(s::Int, b::Int, t::Int)
+    return tileget(36s + 4b + t)
+end
+
+if !( @isdefined Wall )
+    const Wall = Dict("$c" => tileget(c) for c = 0:135)
 end
