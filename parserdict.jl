@@ -6,31 +6,6 @@ include("utility.jl")
 
 if !( @isdefined ParserDict )
 
-    function draw(str::AbstractString, pst::PlayState, i::Int)
-
-        pst.turn = pst.turn + 1
-        pst.hands[i][end] = Wall[str]
-    end
-
-    function drop(str::AbstractString, pst::PlayState, i::Int)
-
-        droppedtile = Wall[str]
-
-        dropindex = findfirst(isequal(missing), pst.discard[i])
-        pst.discard[i][dropindex] = droppedtile
-
-        if !isequal(pst.hands[i][end], droppedtile)
-
-            dropindex = findfirst(isequal(missing), pst.tedashi[i])
-            pst.tedashi[i][dropindex] = droppedtile
-
-            tileindex = findfirst(isequal(droppedtile), pst.hands[i])
-            pst.hands[i][tileindex] = pst.hands[i][end]
-        end
-
-        pst.hands[i][end] = missing
-    end
-
     const ParserDict = Dict(
 
     "GO" => (str::AbstractString, pst::PlayState) -> begin
@@ -104,7 +79,7 @@ if !( @isdefined ParserDict )
         pst.cycle = Round(number)
         pst.rolls = Dice(dice01), Dice(dice02)
 
-        pst.dealer = parsekey((s)->Seat(parse(Int,s)), "oya", str)
+        pst.dealer = Seat(parsekey((s)->parse(Int,s), "oya", str))
         splitkey((s)->parse(Int32,s), "ten", str, pst.scores)
 
         playercount = length(pst.table.namaes)
@@ -153,8 +128,8 @@ if !( @isdefined ParserDict )
         ura = Tile[]; splitkey((s)->Wall[s], "doraHaiUra", str, ura)
 
         pst.result = RoundWin(pt, (han, fu), Limit(lh), yaku, dora, ura,
-            parsekey((s)->Seat(parse(Int,s)), "who", str),
-            parsekey((s)->Seat(parse(Int,s)), "fromWho", str)
+            Seat(parsekey((s)->parse(Int,s), "who", str)),
+            Seat(parsekey((s)->parse(Int,s), "fromWho", str))
         )
 
         sc = splitkey((s)->parse(Int,s), "sc", str, Vector{Int}(undef, 8))
@@ -238,67 +213,28 @@ if !( @isdefined ParserDict )
         code = parsekey((s)->parse(Int,s), "m", str) + 0
         from = mod(who + code & 0x3, 1:4)
 
-        if (code & 0x4 != 0) # chii
-
-            base, call = divrem(code >> 10, 3)
-            suit, base = divrem(base, 7)
-
-            tls = [tileget(suit, base + i, code >> (3+2*i) & 0x3) for i = 0:2]
-
-            play = チー
-
-        elseif (code & 0x8 != 0) # pon
-
-            base, call = divrem(code >> 9, 3)
-            suit, base = divrem(base, 9)
-
-            tls = [tileget(suit, base, i) for i = 0:3 if i != code >> 5 & 0x3]
-
-            play = ポン
-
-        elseif (code & 0x10 != 0) # kan1
-
-            base, call = div(code >> 9, 3), 3
-            suit, base = divrem(base, 9)
-
-            tls = [tileget(suit, base, i) for i = 0:3 if i != code >> 5 & 0x3]
-                        push!(tls, tileget(suit, base, code >> 5 & 0x3))
-
-            play = 大明槓
-
-        elseif (code & 0x20 != 0) # pei
-
-            call = 0
-            tls = [Tile(北, 字牌)]
-            play = キタ
-
-        else # kan2
-
-            base, call = divrem(code >> 8, 4)
-            suit, base = divrem(base, 9)
-
-            tls = [tileget(suit, base, i) for i = 0:3]
-
-            play = from == who ? 暗槓 : 小明槓
+        if      (code & 0x04 != 0)  meld = chi(code, who, from)
+        elseif  (code & 0x08 != 0)  meld = pon(code, who, from)
+        elseif  (code & 0x10 != 0)  meld = kkn(code, who, from)
+        elseif  (code & 0x20 != 0)  meld = pei(code, who, from)
+        else    #= code unknown =#  meld = kan(code, who, from)
         end
 
         meldindex = findfirst(isequal(missing), pst.melds[who])
-        pst.melds[who][meldindex] = Meld(play, Seat(from-1), tls[call+1], tls)
+        pst.melds[who][meldindex] = meld
 
-        if (play != 大明槓)
-            for tile in tls[1:length(tls).!=(call+1)]
-                tileindex = findfirst(isequal(tile), pst.hands[who])
-                (pst.hands[who][tileindex] = missing)
-            end
+        for tile in meld.with
+            tileindex = findfirst(isequal(tile), pst.hands[who])
+            pst.hands[who][tileindex] = missing
         end
 
         if !ismissing(pst.hands[who][end])
-            tileindex = findfirst(isequal(tls[call+1]), pst.hands[who])
+            tileindex = findfirst(isequal(meld.tile), pst.hands[who])
             pst.hands[who][tileindex] = pst.hands[who][end]
             pst.hands[who][end] = missing
         end
 
-        if (play != 暗槓)
+        if (meld.play != 暗槓)
             pst.status[who] = OPENED
         end
 
@@ -326,7 +262,7 @@ if !( @isdefined ParserDict )
     end,
 
     "BYE" => (str::AbstractString, pst::PlayState) -> begin
-        push!(pst.dced, parsekey((s)->Seat(parse(Int,s)), "who", str))
+        push!(pst.dced, Seat(parsekey((s)->parse(Int,s), "who", str)))
         return playerdc
     end,
 
