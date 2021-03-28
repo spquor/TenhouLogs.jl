@@ -2,7 +2,7 @@ using SQLite
 using DataFrames
 using CodecLz4
 
-include("parserdict.jl")
+using MjStats
 
 function analyseLog(str::AbstractString)
 
@@ -51,7 +51,7 @@ function queryLogs(dbpath::String)
     )
 
     # decompress tenhou log contents and return processed table
-    for i = 1:1000
+    Threads.@threads for i = 1:1000
         # println(i, "\t|\t", "http://tenhou.net/0/?log=", table.id[i])
         stringbuffer = transcode(LZ4FrameDecompressor, table.content[i])
         analyseLog(String(stringbuffer))

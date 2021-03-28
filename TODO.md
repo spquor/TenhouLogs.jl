@@ -1,8 +1,8 @@
 
 # TODO STRING PERFORMANCE IMPROVEMENTS
-# 1. string inside string search is a huge time sink
-# 2. immutable strings could be changed to cstring ptr
-# 3. default hash function could maybe not needed
+# 1. searching string inside string is slow
+# 2. immutable strings could be changed to cstrings
+# 3. hash function for dicts could be improved
 #
 
 using StringViews
@@ -35,7 +35,9 @@ function rxiterator(rx::Regex, str::AbstractString)
 end
 
 
-# FunctionWrappers could be useful for ccalling
+# 1. Anonymous functions could be causing slowdowns
+# 2. Function caching and globaling can improve performance
+# 3. FunctionWrappers could be useful for ccalling
 #
 
 using FunctionWrappers

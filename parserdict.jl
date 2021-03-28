@@ -1,12 +1,7 @@
 
-include("playdata.jl")
-include("utility.jl")
-
 @enum MatchEvent noevents matchset roundinit roundwin roundtie matchend tiledraw tiledrop meldcall riichicall doraflip playerdc playerin
 
-if !( @isdefined ParserDict )
-
-    const ParserDict = Dict(
+const ParserDict = Dict(
 
     "GO" => (str::AbstractString, pst::PlayState) -> begin
 
@@ -59,7 +54,7 @@ if !( @isdefined ParserDict )
         pst.melds = [Melds(undef, 8) for i in 1:playercount]
         pst.discard = [Tiles(undef, 32) for i in 1:playercount]
         pst.tedashi = [Tiles(undef, 32) for i in 1:playercount]
-        pst.flipped = [Tiles(undef, 1) for i in 1:playercount]
+        pst.rchtile = [Tiles(undef, 1) for i in 1:playercount]
 
         pst.scores = Vector{Int32}(undef, playercount)
         pst.status = Vector{State}(undef, playercount)
@@ -71,7 +66,7 @@ if !( @isdefined ParserDict )
 
         roundseed = splitkey((s)->(s), "seed", str,
                 Vector{String}(undef, 6))
-        number, pst.honba, pst.riichi, dice01, dice02 =
+        number, pst.honba, pst.rbets, dice01, dice02 =
                 map((s)-> s[1] - '0', roundseed)
         pst.doraid = [Wall[roundseed[end]]]
 
@@ -90,7 +85,7 @@ if !( @isdefined ParserDict )
             fill!(pst.melds[i], missing)
             fill!(pst.discard[i], missing)
             fill!(pst.tedashi[i], missing)
-            fill!(pst.flipped[i], missing)
+            fill!(pst.rchtile[i], missing)
             splitkey(
                 (s)->Wall[s], haikey[i],
                     str, pst.hands[i]
@@ -250,7 +245,7 @@ if !( @isdefined ParserDict )
         else
             pst.scores[who] -= 10
             tileindex = findfirst(isequal(missing), pst.discard[who])
-            pst.flipped[who][begin] = pst.discard[who][tileindex-1]
+            pst.rchtile[who][begin] = pst.discard[who][tileindex-1]
         end
 
         return riichicall
@@ -282,4 +277,3 @@ if !( @isdefined ParserDict )
         return matchend
     end
 )
-end
