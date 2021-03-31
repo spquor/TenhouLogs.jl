@@ -103,12 +103,12 @@ const ParserDict = Dict(
         fu, pt, lh = splitkey((s)->parse(Int,s), "ten", str,
                 Vector{Int}(undef, 3))
 
-        yaku = Tuple{Yaku,Int8}[]
+        yaku = Tuple{Yaku,Int}[]
 
         if occursin("yakuman", str)
             ykm::Vector{Int} = splitkey((s)->parse(Int,s), "yakuman", str)
             for index in range(1, length(ykm); step = 1)
-                push!(yaku, (Yaku(ykm[index]), 13))
+                push!(yaku, (Yaku(ykm[index]), 1))
             end
         else
             yku::Vector{Int} = splitkey((s)->parse(Int,s), "yaku", str)

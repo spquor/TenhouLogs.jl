@@ -1,62 +1,71 @@
-using SQLite
-using DataFrames
-using CodecLz4
 
-using MjStats
+function analyseDatabase(dbpath::String, cbacks::Dict{MatchEvent,Function};
+        readsize::Int = 2000, offset::Int = 0, total::Int = 0)
 
-function analyseLog(str::AbstractString)
+    # initialize main data structures
+    if !isfile(dbpath) error("Database not found") end
+    db = SQLite.DB(dbpath)
+    playstates = [PlayState(undef) for i=1:2]
 
-    playstate = PlayState(undef)
-
-    brk(c) = ('0' <= c <= '9' || c == ' ' || c == '/')
-
-    status = 1
-    strlen = sizeof(str)
-
-    while status < strlen
-
-        tagbeg::Int = findnext('<', str, status)
-        tagend::Int = findnext(brk, str, tagbeg)
-        status::Int = findnext('>', str, tagend)
-
-        tag = str[tagbeg+1:tagend-1]
-        data = str[tagend:status-2]
-
-        ParserDict[tag](data, playstate)
+    # check database reading boundaties
+    maxrecords = DataFrame(
+        DBInterface.execute(db, "SELECT COUNT(id) FROM records"))[!,1][1]
+    if iszero(total) || total > maxrecords
+        total = maxrecords
     end
 
-end
+    # read and parse chunks of records
+    while offset < total
 
-function queryLog(dbpath::String, logidx::Int)
+        # construct temporary index and select subtable
+        table = DataFrame(
+            DBInterface.execute(db, "SELECT * FROM records WHERE id IN
+            (SELECT id FROM records LIMIT $readsize OFFSET $offset)")
+        )
 
-    # establish connection and select table
-    db = SQLite.DB(dbpath)
-    table = DataFrame(
-        DBInterface.execute(db, "SELECT id, content FROM records LIMIT 1000;")
-    )
+        # parsing problems are fast when done in parallel
+        Threads.@threads for i = 1:min(nrow(table), readsize)
 
-    # decompress tenhou log contents and return processed table
-    # println("http://tenhou.net/0/?log=", table.id[logidx])
-    return String(
-        transcode(LZ4FrameDecompressor, table.content[logidx])
-    )
-end
+            # decompress tenhou log contents into immutable string
+            str = String(transcode(LZ4FrameDecompressor, table.content[i]))
 
-function queryLogs(dbpath::String)
+            status = 1
+            strlen = sizeof(str)
 
-    # establish connection and select table
-    db = SQLite.DB(dbpath)
-    table = DataFrame(
-        DBInterface.execute(db, "SELECT id, content FROM records LIMIT 1000;")
-    )
+            # parse using function dictionary
+            while status < strlen
 
-    # decompress tenhou log contents and return processed table
-    Threads.@threads for i = 1:1000
-        # println(i, "\t|\t", "http://tenhou.net/0/?log=", table.id[i])
-        stringbuffer = transcode(LZ4FrameDecompressor, table.content[i])
-        analyseLog(String(stringbuffer))
+                brk(c) = ('0' <= c <= '9' || c == ' ' || c == '/')
+
+                tagbeg::Int = findnext('<', str, status)
+                tagend::Int = findnext(brk, str, tagbeg)
+                status::Int = findnext('>', str, tagend)
+
+                tag = str[tagbeg+1:tagend-1]
+                data = str[tagend:status-2]
+
+                try
+                    ParserDict[tag](data, playstates[Threads.threadid()])
+                        # and callback on any user event
+                catch ex
+                    println(offset + i, "\t|\t", "http://tenhou.net/0/?log=",
+                            table.id[i])
+                    rethrow(ex)
+                end
+
+            end
+        end
+
+        # shift subtable offset
+        offset = offset + readsize
     end
+
+    return nothing
 end
 
-# analyseLog(queryLog("scraw2009s4p.db", 25))
-queryLogs("scraw2009s4p.db")
+function analyseLog(dbpath::String, cbacks::Dict{MatchEvent,Function}, i::Int)
+
+    analyseDatabase(dbpath, cbacks; readsize=1, offset=i, total=1+i)
+
+    return nothing
+end

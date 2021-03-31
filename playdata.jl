@@ -6,8 +6,8 @@
 @enum Dice ⚀ ⚁ ⚂ ⚃ ⚄ ⚅
 @enum Seat 東家 南家 西家 北家
 
-@enum Suit::Int8 萬子 筒子 索子 字牌
-@enum Rank::Int8 赤 一 二 三 四 五 六 七 八 九 東 南 西 北 白 發 中
+@enum Suit::UInt8 萬子 筒子 索子 字牌
+@enum Rank::UInt8 赤 一 二 三 四 五 六 七 八 九 東 南 西 北 白 發 中
 
 @enum Yaku mentsumo riichi ippatsu chankan rinshan haitei houtei pinfu tanyao ipeiko tonpai nanpai xiapai peipai tonhai nanhai xiahai peihai haku hatsu chun daburii chiitoitsu chanta ittsu sandoujun sandoukou sankantsu toitoi sanankou shousangen honroutou ryanpeikou junchan honitsu chinitsu renhou tenhou chihou daisangen suuankou suuankoutanki tsuuiisou ryuuiisou chinroutou chuurenpouto junseichuurenpouto kokushi kokushijuusan daisuushi shousuushi suukantsu dora uradora akadora
 @enum Limit nolimit mangan haneman baiman sanbaiman yakuman
@@ -54,7 +54,7 @@ end
 
 struct RoundWin
     value::     Int32
-    hanfu::     Tuple{Int8,Int8}
+    hanfu::     Tuple{UInt8,UInt8}
     limit::     Limit
     yaku::      Vector{Tuple{Yaku,Int}}
     dora::      Tiles
