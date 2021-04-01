@@ -34,8 +34,9 @@ const ParserDict = Dict(
 
         if length(namaes) == 1
             nameindex = findfirst(isequal(namaes[1]), pst.table.namaes) - 1
-            seatindex = findfirst(isequal(Seat(nameindex)), pst.dced) + 0
-            deleteat!(pst.dced, seatindex)
+            seatindex = findfirst(isequal(Seat(nameindex)), pst.dced)
+            if !isnothing(seatindex) deleteat!(pst.dced, seatindex)
+            else push!(pst.dced, Seat(nameindex)) end
             return playerin
         end
 
@@ -51,7 +52,7 @@ const ParserDict = Dict(
         pst.dced = Seat[]
 
         pst.hands = [Tiles(undef, 14) for i in 1:playercount]
-        pst.melds = [Melds(undef, 8) for i in 1:playercount]
+        pst.melds = [Melds(undef, 12) for i in 1:playercount]
         pst.discard = [Tiles(undef, 32) for i in 1:playercount]
         pst.tedashi = [Tiles(undef, 32) for i in 1:playercount]
         pst.rchtile = [Tiles(undef, 1) for i in 1:playercount]
@@ -205,7 +206,7 @@ const ParserDict = Dict(
     "N" => (str::AbstractString, pst::PlayState) -> begin
 
         who = parsekey((s)->parse(Int,s), "who", str) + 1
-        code = parsekey((s)->parse(Int,s), "m", str) + 0
+        code = parsekey((s)->parse(Int,s), "m", str)
         from = mod(who + code & 0x3, 1:4)
 
         if      (code & 0x04 != 0)  meld = chi(code, who, from)
@@ -257,7 +258,10 @@ const ParserDict = Dict(
     end,
 
     "BYE" => (str::AbstractString, pst::PlayState) -> begin
-        push!(pst.dced, Seat(parsekey((s)->parse(Int,s), "who", str)))
+        seat = Seat(parsekey((s)->parse(Int,s), "who", str))
+        dcedindex = findfirst(isequal(seat), pst.dced)
+        if isnothing(dcedindex) push!(pst.dced, seat)
+        else deleteat!(pst.dced, dcedindex) end
         return playerdc
     end,
 

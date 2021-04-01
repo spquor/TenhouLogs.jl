@@ -5,14 +5,11 @@ function analyseDatabase(dbpath::String, cbacks::Dict{MatchEvent,Function};
     # initialize main data structures
     if !isfile(dbpath) error("Database not found") end
     db = SQLite.DB(dbpath)
-    playstates = [PlayState(undef) for i=1:2]
+    playstates = [PlayState(undef) for i=1:Threads.nthreads()]
 
     # check database reading boundaties
-    maxrecords = DataFrame(
-        DBInterface.execute(db, "SELECT COUNT(id) FROM records"))[!,1][1]
-    if iszero(total) || total > maxrecords
-        total = maxrecords
-    end
+    iszero(total) && (total = DataFrame(
+            DBInterface.execute(db, "SELECT COUNT(id) FROM records"))[1,1])
 
     # read and parse chunks of records
     while offset < total
@@ -32,7 +29,7 @@ function analyseDatabase(dbpath::String, cbacks::Dict{MatchEvent,Function};
             status = 1
             strlen = sizeof(str)
 
-            # parse using function dictionary
+            # read tags sequentially
             while status < strlen
 
                 brk(c) = ('0' <= c <= '9' || c == ' ' || c == '/')
@@ -45,6 +42,7 @@ function analyseDatabase(dbpath::String, cbacks::Dict{MatchEvent,Function};
                 data = str[tagend:status-2]
 
                 try
+                    # parse using function dictionary
                     ParserDict[tag](data, playstates[Threads.threadid()])
                         # and callback on any user event
                 catch ex
@@ -65,7 +63,7 @@ end
 
 function analyseLog(dbpath::String, cbacks::Dict{MatchEvent,Function}, i::Int)
 
-    analyseDatabase(dbpath, cbacks; readsize=1, offset=i, total=1+i)
+    analyseDatabase(dbpath, cbacks; readsize=1, offset=i-1, total=i)
 
     return nothing
 end
