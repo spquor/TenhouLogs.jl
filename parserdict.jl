@@ -1,9 +1,7 @@
 
 @enum MatchEvent noevents matchset roundinit roundwin roundtie matchend tiledraw tiledrop meldcall riichicall doraflip playerdc playerin
 
-const ParserDict = Dict(
-
-    "GO" => (str::AbstractString, pst::PlayState) -> begin
+    function GO(str::String, pst::PlayState)
 
         function getbits(code)
             digits(parse(Int, code); base = 2, pad = 8)
@@ -20,9 +18,9 @@ const ParserDict = Dict(
                 bits[4], bits[5], bits[7], lobby)
 
         return noevents
-    end,
+    end
 
-    "UN" => (str::AbstractString, pst::PlayState) -> begin
+    function UN(str::String, pst::PlayState)
 
         namaes = String[]
         for namekey in ("n0", "n1", "n2", "n3")
@@ -61,9 +59,9 @@ const ParserDict = Dict(
         pst.status = Vector{State}(undef, playercount)
 
         return matchset
-    end,
+    end
 
-    "INIT" => (str::AbstractString, pst::PlayState) -> begin
+    function INIT(str::String, pst::PlayState)
 
         roundseed = splitkey((s)->(s), "seed", str,
                 Vector{String}(undef, 6))
@@ -97,9 +95,9 @@ const ParserDict = Dict(
         pst.result = nothing
 
         return roundinit
-    end,
+    end
 
-    "AGARI" => (str::AbstractString, pst::PlayState) -> begin
+    function AGA(str::String, pst::PlayState)
 
         fu, pt, lh = splitkey((s)->parse(Int,s), "ten", str,
                 Vector{Int}(undef, 3))
@@ -134,9 +132,9 @@ const ParserDict = Dict(
         end
 
         return roundwin
-    end,
+    end
 
-    "RYUUKYOKU" => (str::AbstractString, pst::PlayState) -> begin
+    function RYU(str::String, pst::PlayState)
 
         tierule::Ryuukyoku = tsuujou
         reveal = Seat[]
@@ -161,49 +159,34 @@ const ParserDict = Dict(
         end
 
         return roundtie
-    end,
+    end
 
-    "T" => (str::AbstractString, pst::PlayState) -> begin
-        draw(str, pst, 1)
-        return tiledraw
-    end,
+    function DRAW(str::AbstractString, pst::PlayState, i::Int)
 
-    "U" => (str::AbstractString, pst::PlayState) -> begin
-        draw(str, pst, 2)
-        return tiledraw
-    end,
+        pst.turn = pst.turn + 1
+        pst.hands[i][end] = Wall[str]
+    end
 
-    "V" => (str::AbstractString, pst::PlayState) -> begin
-        draw(str, pst, 3)
-        return tiledraw
-    end,
+    function DROP(str::AbstractString, pst::PlayState, i::Int)
 
-    "W" => (str::AbstractString, pst::PlayState) -> begin
-        draw(str, pst, 4)
-        return tiledraw
-    end,
+        droppedtile = Wall[str]
 
-    "D" => (str::AbstractString, pst::PlayState) -> begin
-        drop(str, pst, 1)
-        return tiledrop
-    end,
+        dropindex = findfirst(isequal(missing), pst.discard[i])
+        pst.discard[i][dropindex] = droppedtile
 
-    "E" => (str::AbstractString, pst::PlayState) -> begin
-        drop(str, pst, 2)
-        return tiledrop
-    end,
+        if !isequal(pst.hands[i][end], droppedtile)
 
-    "F" => (str::AbstractString, pst::PlayState) -> begin
-        drop(str, pst, 3)
-        return tiledrop
-    end,
+            dropindex = findfirst(isequal(missing), pst.tedashi[i])
+            pst.tedashi[i][dropindex] = droppedtile
 
-    "G" => (str::AbstractString, pst::PlayState) -> begin
-        drop(str, pst, 4)
-        return tiledrop
-    end,
+            tileindex = findfirst(isequal(droppedtile), pst.hands[i])
+            pst.hands[i][tileindex] = pst.hands[i][end]
+        end
 
-    "N" => (str::AbstractString, pst::PlayState) -> begin
+        pst.hands[i][end] = missing
+    end
+
+    function MELD(str::String, pst::PlayState)
 
         who = parsekey((s)->parse(Int,s), "who", str) + 1
         code = parsekey((s)->parse(Int,s), "m", str)
@@ -235,9 +218,9 @@ const ParserDict = Dict(
         end
 
         return meldcall
-    end,
+    end
 
-    "REACH" => (str::AbstractString, pst::PlayState) -> begin
+    function RCH(str::String, pst::PlayState)
 
         who = parsekey((s)->parse(Int,s), "who", str) + 1
 
@@ -250,34 +233,25 @@ const ParserDict = Dict(
         end
 
         return riichicall
-    end,
+    end
 
-    "DORA" => (str::AbstractString, pst::PlayState) -> begin
+    function DORA(str::String, pst::PlayState)
         push!(pst.doraid, parsekey((s)->Wall[s], "hai", str))
         return doraflip
-    end,
+    end
 
-    "BYE" => (str::AbstractString, pst::PlayState) -> begin
+    function BYE(str::String, pst::PlayState)
         seat = Seat(parsekey((s)->parse(Int,s), "who", str))
         dcedindex = findfirst(isequal(seat), pst.dced)
         if isnothing(dcedindex) push!(pst.dced, seat)
         else deleteat!(pst.dced, dcedindex) end
         return playerdc
-    end,
+    end
 
-    "SHUFFLE" => (str::AbstractString, pst::PlayState) -> begin
+    function SKIP(str::String, pst::PlayState)
         return noevents
-    end,
+    end
 
-    "TAIKYOKU" => (str::AbstractString, pst::PlayState) -> begin
-        return noevents
-    end,
-
-    "mjloggm" => (str::AbstractString, pst::PlayState) -> begin
-        return noevents
-    end,
-
-    "" => (str::AbstractString, pst::PlayState) -> begin
+    function END(str::String, pst::PlayState)
         return matchend
     end
-)

@@ -15,32 +15,6 @@ end
 const Wall = Dict("$c" => tileget(c) for c = 0:135)
 
 
-@inline function draw(str::AbstractString, pst::PlayState, i::Int)
-
-    pst.turn = pst.turn + 1
-    pst.hands[i][end] = Wall[str]
-end
-
-@inline function drop(str::AbstractString, pst::PlayState, i::Int)
-
-    droppedtile = Wall[str]
-
-    dropindex = findfirst(isequal(missing), pst.discard[i])
-    pst.discard[i][dropindex] = droppedtile
-
-    if !isequal(pst.hands[i][end], droppedtile)
-
-        dropindex = findfirst(isequal(missing), pst.tedashi[i])
-        pst.tedashi[i][dropindex] = droppedtile
-
-        tileindex = findfirst(isequal(droppedtile), pst.hands[i])
-        pst.hands[i][tileindex] = pst.hands[i][end]
-    end
-
-    pst.hands[i][end] = missing
-end
-
-
 @inline function chi(code::Int, who::Int, from::Int)
 
     base, call = divrem(code >> 10, 3)
