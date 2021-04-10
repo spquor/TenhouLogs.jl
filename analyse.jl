@@ -1,30 +1,31 @@
 
 function analyseDatabase(dbpath::String, cbacks::Dict{MatchEvent,Function};
-        readsize::Int = 2000, offset::Int = 0, total::Int = 0)
+        readsize::Int = 1000, offset::Int = 0, total::Int = 0)
 
-    # initialize main data structures
+    # open database and compile sql statement
     if !isfile(dbpath) error("Database not found") end
     db = SQLite.DB(dbpath)
-    playstates = [PlayState(undef) for i=1:Threads.nthreads()]
+    iszero(total) && (total = Tables.rowtable(
+            DBInterface.execute(db, "SELECT COUNT(id) FROM records"))[1][1])
+    tableselect = DBInterface.prepare(db, "SELECT * FROM records WHERE id IN
+            (SELECT id FROM records LIMIT ? OFFSET ?)")
 
-    # check database reading boundaties
-    iszero(total) && (total = DataFrame(
-            DBInterface.execute(db, "SELECT COUNT(id) FROM records"))[1,1])
+    # initialize main data structures
+    playstates = [PlayState(undef) for i=1:Threads.nthreads()]
 
     # read and parse chunks of records
     while offset < total
 
-        # construct temporary index and select subtable
-        table = DataFrame(
-            DBInterface.execute(db, "SELECT * FROM records WHERE id IN
-            (SELECT id FROM records LIMIT $readsize OFFSET $offset)")
+        # select required subtable
+        table = Tables.rowtable(
+            DBInterface.execute(tableselect, (readsize, offset))
         )
 
         # parsing problems are fast when done in parallel
-        Threads.@threads for i = 1:min(nrow(table), readsize)
+        Threads.@threads for i = 1:min(length(table), readsize)
 
             # decompress tenhou log contents into immutable string
-            str = String(transcode(LZ4FrameDecompressor, table.content[i]))
+            str = String(transcode(LZ4FrameDecompressor, table[i].content))
 
             status = 1
             strlen = sizeof(str)
@@ -49,6 +50,7 @@ function analyseDatabase(dbpath::String, cbacks::Dict{MatchEvent,Function};
                     elseif tag == "GO"          GO(data, st)
                     elseif tag == "UN"          UN(data, st)
                     elseif tag == "INIT"        INIT(data, st)
+                    elseif tag == "AGARI"       AGA(data, st)
                     elseif tag == "RYUUKYOKU"   RYU(data, st)
                     elseif tag == "T"           DRAW(data, st, 1)
                     elseif tag == "U"           DRAW(data, st, 2)
@@ -67,8 +69,9 @@ function analyseDatabase(dbpath::String, cbacks::Dict{MatchEvent,Function};
 
                         # and callback on any user event
                 catch ex
-                    println(offset + i, "\t|\t", "http://tenhou.net/0/?log=",
-                            table.id[i])
+                    println("Error in log #", offset + i, "\t|\t",
+                            "http://tenhou.net/0/?log=", table[i].id, "\t|\t",
+                            "Round:", st.cycle, " / ", st.turn, "\t|\t")
                     rethrow(ex)
                 end
 

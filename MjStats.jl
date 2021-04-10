@@ -1,6 +1,7 @@
-module MjStats
 
-# __precompile__(false)
+__precompile__(true)
+
+module MjStats
 
 include("playdata.jl")
 include("playutils.jl")
@@ -12,7 +13,7 @@ export PlayState
 export MatchEvent
 
 using SQLite
-using DataFrames
+using Tables
 using CodecLz4
 
 include("analyse.jl")
