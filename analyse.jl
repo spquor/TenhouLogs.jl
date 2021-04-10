@@ -1,5 +1,8 @@
 
-function analyseDatabase(dbpath::String, cbacks::Dict{MatchEvent,Function};
+# specialize this function with needed MatchEvent values
+function analyzer(::Val{default}, pst::PlayState) where {default} nothing end
+
+function analyseDatabase(dbpath::String;
         readsize::Int = 1000, offset::Int = 0, total::Int = 0)
 
     # open database and compile sql statement
@@ -45,29 +48,29 @@ function analyseDatabase(dbpath::String, cbacks::Dict{MatchEvent,Function};
 
                 try
                     # parse using function dictionary
-
-                    if isempty(tag)             END(data, st)
-                    elseif tag == "GO"          GO(data, st)
-                    elseif tag == "UN"          UN(data, st)
-                    elseif tag == "INIT"        INIT(data, st)
-                    elseif tag == "AGARI"       AGA(data, st)
-                    elseif tag == "RYUUKYOKU"   RYU(data, st)
-                    elseif tag == "T"           DRAW(data, st, 1)
-                    elseif tag == "U"           DRAW(data, st, 2)
-                    elseif tag == "V"           DRAW(data, st, 3)
-                    elseif tag == "W"           DRAW(data, st, 4)
-                    elseif tag == "D"           DROP(data, st, 1)
-                    elseif tag == "E"           DROP(data, st, 2)
-                    elseif tag == "F"           DROP(data, st, 3)
-                    elseif tag == "G"           DROP(data, st, 4)
-                    elseif tag == "N"           MELD(data, st)
-                    elseif tag == "REACH"       RCH(data, st)
-                    elseif tag == "DORA"        DORA(data, st)
-                    elseif tag == "BYE"         BYE(data, st)
-                    else                        SKIP(data, st)
+                    if isempty(tag)             ev = END(data, st)
+                    elseif tag == "GO"          ev = GO(data, st)
+                    elseif tag == "UN"          ev = UN(data, st)
+                    elseif tag == "INIT"        ev = INIT(data, st)
+                    elseif tag == "AGARI"       ev = AGA(data, st)
+                    elseif tag == "RYUUKYOKU"   ev = RYU(data, st)
+                    elseif tag == "T"           ev = DRAW(data, st, 1)
+                    elseif tag == "U"           ev = DRAW(data, st, 2)
+                    elseif tag == "V"           ev = DRAW(data, st, 3)
+                    elseif tag == "W"           ev = DRAW(data, st, 4)
+                    elseif tag == "D"           ev = DROP(data, st, 1)
+                    elseif tag == "E"           ev = DROP(data, st, 2)
+                    elseif tag == "F"           ev = DROP(data, st, 3)
+                    elseif tag == "G"           ev = DROP(data, st, 4)
+                    elseif tag == "N"           ev = MELD(data, st)
+                    elseif tag == "REACH"       ev = RCH(data, st)
+                    elseif tag == "DORA"        ev = DORA(data, st)
+                    elseif tag == "BYE"         ev = BYE(data, st)
+                    else                        ev = SKIP(data, st)
                     end
 
                         # and callback on any user event
+                        analyzer(Val(ev), st)
                 catch ex
                     println("Error in log #", offset + i, "\t|\t",
                             "http://tenhou.net/0/?log=", table[i].id, "\t|\t",
@@ -85,9 +88,9 @@ function analyseDatabase(dbpath::String, cbacks::Dict{MatchEvent,Function};
     return nothing
 end
 
-function analyseLog(dbpath::String, cbacks::Dict{MatchEvent,Function}, i::Int)
+function analyseLog(dbpath::String, i::Int)
 
-    analyseDatabase(dbpath, cbacks; readsize=1, offset=i-1, total=i)
+    analyseDatabase(dbpath; readsize=1, offset=i-1, total=i)
 
     return nothing
 end
