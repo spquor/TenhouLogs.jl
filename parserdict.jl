@@ -1,7 +1,7 @@
 
 @enum MatchEvent noevents matchset roundinit roundwin roundtie matchend tiledraw tiledrop meldcall riichicall doraflip playerdc playerin
 
-    function GO(str::String, pst::PlayState)
+    function GO(str::AbstractString, pst::PlayState)
 
         function getbits(code)
             digits(parse(Int, code); base = 2, pad = 8)
@@ -20,7 +20,7 @@
         return noevents
     end
 
-    function UN(str::String, pst::PlayState)
+    function UN(str::AbstractString, pst::PlayState)
 
         namaes = String[]
         for namekey in ("n0", "n1", "n2", "n3")
@@ -61,7 +61,7 @@
         return matchset
     end
 
-    function INIT(str::String, pst::PlayState)
+    function INIT(str::AbstractString, pst::PlayState)
 
         roundseed = splitkey((s)->(s), "seed", str,
                 Vector{String}(undef, 6))
@@ -97,7 +97,7 @@
         return roundinit
     end
 
-    function AGA(str::String, pst::PlayState)
+    function AGA(str::AbstractString, pst::PlayState)
 
         fu, pt, lh = splitkey((s)->parse(Int,s), "ten", str,
                 Vector{Int}(undef, 3))
@@ -134,7 +134,7 @@
         return roundwin
     end
 
-    function RYU(str::String, pst::PlayState)
+    function RYU(str::AbstractString, pst::PlayState)
 
         tierule::Ryuukyoku = tsuujou
         reveal = Seat[]
@@ -165,6 +165,8 @@
 
         pst.turn = pst.turn + 1
         pst.hands[i][end] = Wall[str]
+
+        return tiledraw
     end
 
     function DROP(str::AbstractString, pst::PlayState, i::Int)
@@ -184,9 +186,11 @@
         end
 
         pst.hands[i][end] = missing
+
+        return tiledrop
     end
 
-    function MELD(str::String, pst::PlayState)
+    function MELD(str::AbstractString, pst::PlayState)
 
         who = parsekey((s)->parse(Int,s), "who", str) + 1
         code = parsekey((s)->parse(Int,s), "m", str)
@@ -220,7 +224,7 @@
         return meldcall
     end
 
-    function RCH(str::String, pst::PlayState)
+    function RCH(str::AbstractString, pst::PlayState)
 
         who = parsekey((s)->parse(Int,s), "who", str) + 1
 
@@ -235,23 +239,29 @@
         return riichicall
     end
 
-    function DORA(str::String, pst::PlayState)
+    function DORA(str::AbstractString, pst::PlayState)
+
         push!(pst.doraid, parsekey((s)->Wall[s], "hai", str))
+
         return doraflip
     end
 
-    function BYE(str::String, pst::PlayState)
+    function BYE(str::AbstractString, pst::PlayState)
+
         seat = Seat(parsekey((s)->parse(Int,s), "who", str))
         dcedindex = findfirst(isequal(seat), pst.dced)
         if isnothing(dcedindex) push!(pst.dced, seat)
         else deleteat!(pst.dced, dcedindex) end
+
         return playerdc
     end
 
-    function SKIP(str::String, pst::PlayState)
+    function SKIP(str::AbstractString, pst::PlayState)
+
         return noevents
     end
 
-    function END(str::String, pst::PlayState)
+    function END(str::AbstractString, pst::PlayState)
+
         return matchend
     end

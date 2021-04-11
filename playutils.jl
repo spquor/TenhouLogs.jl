@@ -1,5 +1,5 @@
 
-@eval function tileget(c::Int)
+@inline function tileget(c::Int)
     return Tile(
         (c == 16 || c == 52 || c == 88) ? (赤) :
             c < 108 ? Rank(c % 36 ÷ 4 + 1) :

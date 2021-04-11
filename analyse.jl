@@ -1,6 +1,18 @@
 
-# specialize this function with needed MatchEvent values
-function analyzer(::Val{default}, pst::PlayState) where {default} nothing end
+# specialize this function with required MatchEvent values
+function analyzer(::Val{MatchEvent}, pst::PlayState) where {MatchEvent}
+    nothing
+end
+
+function tablesize(stmt::SQLite.Stmt)::Int
+    return Tables.rowtable(DBInterface.execute(stmt))[1][1]
+end
+
+function tabledata(stmt::SQLite.Stmt, args::Tuple{Int,Int})::Array{
+        NamedTuple{(:id, :timestamp, :content),
+        Tuple{String,Int64,Array{UInt8,1}}},1}
+    return Tables.rowtable(DBInterface.execute(stmt, args))
+end
 
 function analyseDatabase(dbpath::String;
         readsize::Int = 1000, offset::Int = 0, total::Int = 0)
@@ -8,21 +20,19 @@ function analyseDatabase(dbpath::String;
     # open database and compile sql statement
     if !isfile(dbpath) error("Database not found") end
     db = SQLite.DB(dbpath)
-    iszero(total) && (total = Tables.rowtable(
-            DBInterface.execute(db, "SELECT COUNT(id) FROM records"))[1][1])
-    tableselect = DBInterface.prepare(db, "SELECT * FROM records WHERE id IN
+    selectsize = DBInterface.prepare(db, "SELECT COUNT(id) FROM records")
+    selectdata = DBInterface.prepare(db, "SELECT * FROM records WHERE id IN
             (SELECT id FROM records LIMIT ? OFFSET ?)")
 
     # initialize main data structures
+    iszero(total) && (total = tablesize(selectsize))
     playstates = [PlayState(undef) for i=1:Threads.nthreads()]
 
     # read and parse chunks of records
     while offset < total
 
         # select required subtable
-        table = Tables.rowtable(
-            DBInterface.execute(tableselect, (readsize, offset))
-        )
+        table = tabledata(selectdata, (readsize, offset))
 
         # parsing problems are fast when done in parallel
         Threads.@threads for i = 1:min(length(table), readsize)
@@ -69,12 +79,27 @@ function analyseDatabase(dbpath::String;
                     else                        ev = SKIP(data, st)
                     end
 
-                        # and callback on any user event
-                        analyzer(Val(ev), st)
+                    # and callback on any user event
+                    if     ev == noevents       analyzer(Val(noevents), st)
+                    elseif ev == matchset       analyzer(Val(matchset), st)
+                    elseif ev == roundinit      analyzer(Val(roundinit), st)
+                    elseif ev == roundwin       analyzer(Val(roundwin), st)
+                    elseif ev == roundtie       analyzer(Val(roundtie), st)
+                    elseif ev == matchend       analyzer(Val(matchend), st)
+                    elseif ev == tiledraw       analyzer(Val(tiledraw), st)
+                    elseif ev == tiledrop       analyzer(Val(tiledrop), st)
+                    elseif ev == meldcall       analyzer(Val(meldcall), st)
+                    elseif ev == riichicall     analyzer(Val(riichicall), st)
+                    elseif ev == doraflip       analyzer(Val(doraflip), st)
+                    elseif ev == playerdc       analyzer(Val(playerdc), st)
+                    elseif ev == playerin       analyzer(Val(playerin), st)
+                    else                        error("Unknown MatchEvent")
+                    end
+
                 catch ex
-                    println("Error in log #", offset + i, "\t|\t",
+                    println("Error while parsing log: \t",
                             "http://tenhou.net/0/?log=", table[i].id, "\t|\t",
-                            "Round:", st.cycle, " / ", st.turn, "\t|\t")
+                            " Round:", st.cycle, " Turn:", st.turn)
                     rethrow(ex)
                 end
 
@@ -90,6 +115,7 @@ end
 
 function analyseLog(dbpath::String, i::Int)
 
+    # log indexing starts from 1 for consistency
     analyseDatabase(dbpath; readsize=1, offset=i-1, total=i)
 
     return nothing
