@@ -1,10 +1,3 @@
-using SQLite
-using DataFrames
-using Dates
-using Downloads
-using ZipFile
-using CodecZlib
-using CodecLz4
 
 function createLogDatabase(dbpath::String)
 
@@ -58,14 +51,15 @@ end
 
 function buildLogDatabase(indexpath::String, dbpath::String, gametype::String)
 
+    @assert startswith(indexpath, "scraw") && endswith(indexpath, "zip")
+
     # open database and compile sql statements
     insertind, insertrec, selectind, selectrec, beginsql, endsql =
             createLogDatabase(dbpath)
     println("* Database connected - ", dbpath)
 
     # get list of subindexes already appended to database
-    indexinfo = DataFrame(DBInterface.execute(selectind))
-    appended = isempty(indexinfo) ? String[] : indexinfo.id::Vector{String}
+    appended::Vector{String} = Tables.columntable(DBInterface.execute(selectind)).id
 
     # create regular expression for specified gametype
     rx = Regex(":(?<min>\\d\\d)[\\W\\d]+?$gametype[^?]+\\?log=(?<id>[^\"]+)")
@@ -122,6 +116,8 @@ end
 
 function downloadLogIndex(year::String)
 
+    @assert 2009 <= parse(Int, year) <= Dates.year(now(UTC))
+
     result = Downloads.download("http://tenhou.net/sc/raw/scraw$year.zip",
             "scraw$year.zip", progress = downloadProgress(), verbose = true)
     write(stdout, "* Download complete: scraw$year.zip\n\n")
@@ -129,53 +125,7 @@ function downloadLogIndex(year::String)
     return result
 end
 
-if !isinteractive() # running as a script
-
-    usage = """Command line usage: julia dbcreate.jl [command]
-      Available commands:
-        index [years] -- Download Tenhou.net scraw indexes for the list of
-                         [years]. Indexes will be used later when creating
-                         log file database.
-        s4p [indexes] -- Create database for all 4p south games in [indexes]
-        e4p [indexes] -- Create database for all 4p east games in [indexes]
-        s3p [indexes] -- Create database for all 3p south games in [indexes]
-        e3p [indexes] -- Create database for all 3p east games in [indexes]
-    """
-
-    function helpfulExit()
-        println(usage)
-        exit()
-    end
-
-    if length(ARGS) < 2
-        helpfulExit()
-    end
-
-    for arg in ARGS[2:length(ARGS)]
-
-        if (ARGS[1] == "index")
-
-            # download index archives for specified years
-            @assert 2009 <= parse(Int, arg) <= Dates.year(now(UTC))
-            downloadLogIndex(arg)
-        else
-
-            # get game type from the first arg
-            if (ARGS[1] == "s4p")
-                gametype = "四.南";
-            elseif (ARGS[1] == "s3p")
-                gametype = "三.南";
-            elseif (ARGS[1] == "e4p")
-                gametype = "四.東";
-            elseif (ARGS[1] == "e3p")
-                gametype = "三.東";
-            else helpfulExit() end
-
-            # create database for selected index archives
-            @assert occursin("scraw", arg) && occursin("zip", arg)
-            databasename = split(arg, ".")[1] * ARGS[1] * ".db"
-            buildLogDatabase(arg, databasename, gametype)
-        end
-    end
-
-end
+const S4P_GAME = "四.南"
+const S3P_GAME = "三.南"
+const E4P_GAME = "四.東"
+const E3P_GAME = "三.東"
