@@ -76,6 +76,7 @@ mutable struct PlayState
         ::UndefInitializer
     ) = new()
 
+    logid::     String
     rules::     Rules
     table::     Table
     dced::      Vector{Seat}

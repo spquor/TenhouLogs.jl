@@ -37,6 +37,10 @@ function analyseDatabase(dbpath::String;
         # parsing problems are fast when done in parallel
         Threads.@threads for i = 1:min(length(table), readsize)
 
+            # get playstate and register log id
+            st = playstates[Threads.threadid()]
+            st.logid = table[i].id
+
             # decompress tenhou log contents into immutable string
             str = String(transcode(LZ4FrameDecompressor, table[i].content))
 
@@ -54,7 +58,6 @@ function analyseDatabase(dbpath::String;
 
                 tag = str[tagbeg+1:tagend-1]
                 data = str[tagend:status-2]
-                st = playstates[Threads.threadid()]
 
                 try
                     # parse using function dictionary
@@ -98,7 +101,7 @@ function analyseDatabase(dbpath::String;
 
                 catch ex
                     println("Error while parsing log: \t",
-                            "http://tenhou.net/0/?log=", table[i].id, "\t|\t",
+                            "http://tenhou.net/0/?log=", st.logid, "\t|\t",
                             " Round:", st.cycle, " Turn:", st.turn)
                     rethrow(ex)
                 end
