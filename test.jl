@@ -1,9 +1,9 @@
-using MjStats
+using TenhouLogs
+const Mj = TenhouLogs
 
-function MjStats.analyzer(::Val{MjStats.matchend}, pst::MjStats.PlayState)
+function Mj.analyzer(::Val{Mj.matchend}, pst::Mj.PlayState)
     @show pst.scores
 end
 
-# MjStats.analyseDatabase("scraw2019s4p.db")
-MjStats.analyseDatabase("scraw2019s4p.db";
-    offset = 170000, total = 0)
+Mj.analyseDatabase("dataset\\scraw2019s4p.db";
+        offset = 170000, total = 0)

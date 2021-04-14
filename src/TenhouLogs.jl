@@ -1,7 +1,7 @@
 
 __precompile__(true)
 
-module MjStats
+module TenhouLogs
 
 include("playdata.jl")
 include("parseutils.jl")
