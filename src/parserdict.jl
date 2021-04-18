@@ -74,6 +74,7 @@
         pst.rolls = Dice(dice01), Dice(dice02)
 
         pst.dealer = Seat(parsekey((s)->parse(Int,s), "oya", str))
+        pst.player = pst.dealer
         splitkey((s)->parse(Int32,s), "ten", str, pst.scores)
 
         playercount = length(pst.table.namaes)
@@ -161,31 +162,32 @@
         return roundtie
     end
 
-    function DRAW(str::AbstractString, pst::PlayState, i::Int)
+    function DRAW(str::AbstractString, pst::PlayState, who::Int)
 
         pst.turn = pst.turn + 1
-        pst.hands[i][end] = Wall[str]
+        pst.player = Seat(who - 1)
+        pst.hands[who][end] = Wall[str]
 
         return tiledraw
     end
 
-    function DROP(str::AbstractString, pst::PlayState, i::Int)
+    function DROP(str::AbstractString, pst::PlayState, who::Int)
 
         droppedtile = Wall[str]
 
-        dropindex = findfirst(isequal(missing), pst.discard[i])
-        pst.discard[i][dropindex] = droppedtile
+        dropindex = findfirst(isequal(missing), pst.discard[who])
+        pst.discard[who][dropindex] = droppedtile
 
-        if !isequal(pst.hands[i][end], droppedtile)
+        if !isequal(pst.hands[who][end], droppedtile)
 
-            dropindex = findfirst(isequal(missing), pst.tedashi[i])
-            pst.tedashi[i][dropindex] = droppedtile
+            dropindex = findfirst(isequal(missing), pst.tedashi[who])
+            pst.tedashi[who][dropindex] = droppedtile
 
-            tileindex = findfirst(isequal(droppedtile), pst.hands[i])
-            pst.hands[i][tileindex] = pst.hands[i][end]
+            tileindex = findfirst(isequal(droppedtile), pst.hands[who])
+            pst.hands[who][tileindex] = pst.hands[who][end]
         end
 
-        pst.hands[i][end] = missing
+        pst.hands[who][end] = missing
 
         return tiledrop
     end
@@ -204,6 +206,7 @@
         end
 
         meldindex = findfirst(isequal(missing), pst.melds[who])
+        pst.player = Seat(who - 1)
         pst.melds[who][meldindex] = meld
 
         for tile in meld.with

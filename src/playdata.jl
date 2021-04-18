@@ -84,6 +84,7 @@ mutable struct PlayState
     cycle::     Round
     rolls::     Tuple{Dice,Dice}
     dealer::    Seat
+    player::    Seat
     honba::     Int8
     rbets::     Int8
     doraid::    Vector{Tile}

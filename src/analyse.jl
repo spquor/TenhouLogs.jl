@@ -25,7 +25,7 @@ function analyseDatabase(dbpath::String;
             (SELECT id FROM records LIMIT ? OFFSET ?)")
 
     # initialize main data structures
-    iszero(total) && (total = tablesize(selectsize))
+    if iszero(total) total = tablesize(selectsize) end
     playstates = [PlayState(undef) for i=1:Threads.nthreads()]
 
     # read and parse chunks of records
