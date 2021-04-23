@@ -7,7 +7,7 @@
 
 This package is not registered, but cloning is very simple.
 ```
-Pkg.add("https://github.com/spquor/TenhouLogs.jl")
+pkg> add https://github.com/spquor/TenhouLogs.jl
 ```
 
 
