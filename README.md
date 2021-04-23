@@ -3,6 +3,14 @@
 *Julia log analysis tools for [Tenhou.net](https://tenhou.net/) mahjong server.*
 
 
+## Installation
+
+This package is not registered, but cloning is very simple.
+```
+Pkg.add("https://github.com/spquor/TenhouLogs.jl")
+```
+
+
 ## Creating log database
 
 First we need to download an annual log index. There are indexes for each year since 2009.
@@ -10,9 +18,9 @@ First we need to download an annual log index. There are indexes for each year s
 TenhouLogs.downloadLogIndex("2012")
 ```
 
-Now we can build log databases like this
+Now we can build log databases like this:
 ```
-MjStats.buildLogDatabase("scraw2012.zip", "scraw2012s4p.db", MjStats.S4P_GAME)
+TenhouLogs.buildLogDatabase("scraw2012.zip", "scraw2012s4p.db", MjStats.S4P_GAME)
 
 # Function requres 3 arguments.
 # 1st agrument is a path to index archive.
@@ -29,13 +37,13 @@ The database uses SQLite engine and logs are compressed with Lz4 algorithm.
 
 ## Analysing datasets
 
-To actually process results we need to define some methods. The following one would print final scores for all processed logs. The function is always called "analyzer". Multiple analyzers can be defined.
+To actually process parsed results we need to define some methods. The following one would print final scores for all processed logs. The function is always called "analyzer". Multiple analyzers can be defined.
 ```
 function TenhouLogs.analyzer(::Val{TenhouLogs.matchend}, pst::TenhouLogs.PlayState)
     @show pst.scores
 end
 
-# Analyzer requires 2 arguments.
+# Analyzer requires 2 arguments. This is a callback function.
 # 1st argument is a value type of the specific match event we need to analyze. Event list can be found in MatchEvents enumeration.
 # 2nd argument is a structure that fully describes current state of a match.
 ```

@@ -1,5 +1,6 @@
 name = "TenhouLogs"
 uuid = "3a4cd5b0-8529-41b7-ab06-edbc7b8b623f"
+license = "MIT"
 authors = ["spquor <spquor@gmail.com> and contributors"]
 version = "0.1.0"
 
