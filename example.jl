@@ -6,4 +6,4 @@ function Mj.analyzer(::Val{Mj.matchend}, pst::Mj.PlayState)
 end
 
 Mj.analyseDatabase("dataset\\scraw2019s4p.db";
-        offset = 170000, total = 0)
+        offset = 170000, limit = 0)

@@ -8,31 +8,34 @@ function tablesize(stmt::SQLite.Stmt)::Int
     return Tables.rowtable(DBInterface.execute(stmt))[1][1]
 end
 
-function tabledata(stmt::SQLite.Stmt, args::Tuple{Int,Int})::Array{
+function tabledata(stmt::SQLite.Stmt, args::Tuple{Int,Int,Int,Int})::Array{
         NamedTuple{(:id, :timestamp, :content),
         Tuple{String,Int64,Array{UInt8,1}}},1}
     return Tables.rowtable(DBInterface.execute(stmt, args))
 end
 
 function analyseDatabase(dbpath::String;
-        readsize::Int = 1000, offset::Int = 0, total::Int = 0)
+        readsize::Int = 1000, offset::Int = 0, limit::Int = 0,
+        mindt::DateTime = DateTime(2000), maxdt::DateTime = now(UTC))
 
     # open database and compile sql statement
     if !isfile(dbpath) error("Database not found") end
     db = SQLite.DB(dbpath)
     selectsize = DBInterface.prepare(db, "SELECT COUNT(id) FROM records")
     selectdata = DBInterface.prepare(db, "SELECT * FROM records WHERE id IN
-            (SELECT id FROM records LIMIT ? OFFSET ?)")
+    (SELECT id FROM records LIMIT ? OFFSET ?) AND timestamp BETWEEN ? AND ?")
+    mindate = Dates.datetime2epochms(mindt)
+    maxdate = Dates.datetime2epochms(maxdt)
 
     # initialize main data structures
-    if iszero(total) total = tablesize(selectsize) end
+    if iszero(limit) limit = tablesize(selectsize) end
     playstates = [PlayState(undef) for i=1:Threads.nthreads()]
 
     # read and parse chunks of records
-    while offset < total
+    while offset < limit
 
         # select required subtable
-        table = tabledata(selectdata, (readsize, offset))
+        table = tabledata(selectdata, (readsize, offset, mindate, maxdate))
 
         # parsing problems are fast when done in parallel
         Threads.@threads for i = 1:min(length(table), readsize)
@@ -119,7 +122,7 @@ end
 function analyseLog(dbpath::String, i::Int)
 
     # log indexing starts from 1 for consistency
-    analyseDatabase(dbpath; readsize=1, offset=i-1, total=i)
+    analyseDatabase(dbpath; readsize=1, offset=i-1, limit=i)
 
     return nothing
 end

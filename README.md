@@ -58,4 +58,9 @@ Actually this can take very long time (depends on db size). Following call will 
 TenhouLogs.analyseDatabase("scraw2012s4p.db"; offset = 100000, total = 110000)
 ```
 
+You can also filter logs by timestamps using Julia Dates module. Following call will process logs from May 13th 2012 to June 22nd 2012.
+```
+TenhouLogs.analyseDatabase("scraw2012s4p.db"; mindt = DateTime(2012,5,13), maxdt = DateTime(2012,6,22,23,59))
+```
+
 Parser is processing 2500 logs per second on my 10 years old i5 with only 2 cores in use (Julia is pretty fast!). This could be exploited to do some fancy math. Also parser uses threading without any synchronization so be careful with shared data access inside analyzers.
