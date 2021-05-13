@@ -55,7 +55,7 @@ TenhouLogs.analyseDatabase("scraw2012s4p.db")
 
 Actually this can take very long time (depends on db size). Following call will process logs from 100000th to 110000th.
 ```
-TenhouLogs.analyseDatabase("scraw2012s4p.db"; offset = 100000, total = 110000)
+TenhouLogs.analyseDatabase("scraw2012s4p.db"; offset = 100000, limit = 110000)
 ```
 
 You can also filter logs by timestamps using Julia Dates module. Following call will process logs from May 13th 2012 to June 22nd 2012.
