@@ -20,7 +20,7 @@ TenhouLogs.downloadLogIndex("2012")
 
 Now we can build log databases like this:
 ```
-TenhouLogs.buildLogDatabase("scraw2012.zip", "scraw2012s4p.db", MjStats.S4P_GAME)
+TenhouLogs.buildLogDatabase("scraw2012.zip", "scraw2012s4p.db", TenhouLogs.S4P_GAME)
 
 # Function requres 3 arguments.
 # 1st agrument is a path to index archive.

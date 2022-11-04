@@ -16,6 +16,8 @@
 @enum State CLOSED OPENED RIICHI
 @enum Play ポン チー 大明槓 小明槓 暗槓 キタ
 
+@enum MatchEvent noevents matchset roundinit roundwin roundtie matchend tiledraw tiledrop meldcall riichicall doraflip playerdc playerin
+
 
 struct Tile
     rank::      Rank
