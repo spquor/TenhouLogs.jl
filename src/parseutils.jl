@@ -25,7 +25,7 @@ end
 function parsekey(parser::Function, key::AbstractString, str::AbstractString)
 
     keyrange = findfirst(key, str)
-    if keyrange == nothing
+    if keyrange === nothing
         return nothing
     end
 
@@ -39,7 +39,7 @@ function splitkey(parser::Function, key::AbstractString, str::AbstractString,
         result::AbstractVector = [], pushindex::Integer = 1)
 
     keyrange = findfirst(key, str)
-    if keyrange == nothing
+    if keyrange === nothing
         return nothing
     end
 
